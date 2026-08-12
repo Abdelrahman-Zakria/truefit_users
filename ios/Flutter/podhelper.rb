@@ -19,6 +19,30 @@ def flutter_ios_podfile_setup; end
 # Same as flutter_ios_podfile_setup for macOS.
 def flutter_macos_podfile_setup; end
 
+def flutter_root
+  # defined_in_file is set by CocoaPods and is a Pathname to the Podfile.
+  podfile_path = File.dirname(defined_in_file.realpath) if respond_to?(:defined_in_file)
+
+  # 1. Try Environment Variable (set by Flutter tool)
+  flutter_root = ENV['FLUTTER_ROOT']
+  return flutter_root if flutter_root && Dir.exist?(flutter_root)
+
+  # 2. Try Generated.xcconfig
+  if podfile_path
+    generated_xcconfig_path = File.expand_path(File.join('Flutter', 'Generated.xcconfig'), podfile_path)
+    if File.exist?(generated_xcconfig_path)
+      config = flutter_parse_xcconfig_file(generated_xcconfig_path)
+      xcconfig_flutter_root = config['FLUTTER_ROOT']
+      if xcconfig_flutter_root && Dir.exist?(xcconfig_flutter_root)
+        return xcconfig_flutter_root
+      end
+    end
+  end
+
+  # 3. Fallback to ENV even if non-existent, or nil
+  return flutter_root
+end
+
 # Determine whether the target depends on Flutter (including transitive dependency)
 def depends_on_flutter(target, engine_pod_name)
   target.dependencies.any? do |dependency|
@@ -51,10 +75,11 @@ def flutter_additional_ios_build_settings(target)
   # ARC code targeting iOS 8 does not build on Xcode 14.3.
   force_to_arc_supported_min = target.deployment_target[/\d+/].to_i < 9
 
-  # This podhelper script is at $FLUTTER_ROOT/packages/flutter_tools/bin.
   # Add search paths from $FLUTTER_ROOT/bin/cache/artifacts/engine.
-  artifacts_dir = File.join('..', '..', '..', '..', 'bin', 'cache', 'artifacts', 'engine')
-  debug_framework_dir = File.expand_path(File.join(artifacts_dir, 'ios', 'Flutter.xcframework'), __FILE__)
+  fr = flutter_root
+  raise "Flutter SDK not found. Please set FLUTTER_ROOT environment variable." if fr.nil?
+  artifacts_dir = File.join(fr, 'bin', 'cache', 'artifacts', 'engine')
+  debug_framework_dir = File.expand_path(File.join(artifacts_dir, 'ios', 'Flutter.xcframework'))
 
   unless Dir.exist?(debug_framework_dir)
     # iOS artifacts have not been downloaded.
@@ -134,11 +159,12 @@ def flutter_additional_macos_build_settings(target)
     (deployment_target_major.to_i < 10) ||
     (deployment_target_major.to_i == 10 && deployment_target_minor.to_i < 15)
 
-  # This podhelper script is at $FLUTTER_ROOT/packages/flutter_tools/bin.
   # Add search paths from $FLUTTER_ROOT/bin/cache/artifacts/engine.
-  artifacts_dir = File.join('..', '..', '..', '..', 'bin', 'cache', 'artifacts', 'engine')
-  debug_framework_dir = File.expand_path(File.join(artifacts_dir, 'darwin-x64', 'FlutterMacOS.xcframework'), __FILE__)
-  release_framework_dir = File.expand_path(File.join(artifacts_dir, 'darwin-x64-release', 'FlutterMacOS.xcframework'), __FILE__)
+  fr = flutter_root
+  raise "Flutter SDK not found. Please set FLUTTER_ROOT environment variable." if fr.nil?
+  artifacts_dir = File.join(fr, 'bin', 'cache', 'artifacts', 'engine')
+  debug_framework_dir = File.expand_path(File.join(artifacts_dir, 'darwin-x64', 'FlutterMacOS.xcframework'))
+  release_framework_dir = File.expand_path(File.join(artifacts_dir, 'darwin-x64-release', 'FlutterMacOS.xcframework'))
   application_path = File.dirname(defined_in_file.realpath) if respond_to?(:defined_in_file)
   # Find the local engine path, if any.
   local_engine = application_path.nil? ?
