@@ -1,0 +1,32 @@
+# 1. Set the minimum platform to 13.0 (Required by modern Firebase SDKs)
+platform :ios, '13.0'
+
+# 2. This line is CRITICAL. It connects the Podfile to Flutter's plugin logic.
+load File.join(File.dirname(File.realpath(__FILE__)), 'Flutter', 'podhelper.rb')
+
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+
+  # 3. This helper installs all your Firebase/Flutter plugins automatically
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+# 4. The Post-Install Block (Solves 90% of Firebase build errors)
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+
+    target.build_configurations.each do |config|
+      # Force every dependency to target iOS 13.0 to prevent version mismatch errors
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+
+      # Fix for Bitcode (Apple deprecated this; newer Firebase versions need it disabled)
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+    end
+  end
+end
