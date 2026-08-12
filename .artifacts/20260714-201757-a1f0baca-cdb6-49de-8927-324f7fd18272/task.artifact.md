@@ -1,0 +1,17 @@
+- [x] Researching existing project structure and requirements
+- [x] Creating initial implementation plan (Notifications & Profile)
+- [x] Revising plan for project-wide Clean Architecture refactor
+- [x] Phase 1: Core & Foundation
+    - [x] Create base UseCase class
+- [x] Phase 2: Refactor Features (Domain -> Data -> Presentation)
+    - [x] Refactor Auth Feature
+    - [x] Refactor Profile Feature
+    - [x] Refactor Notifications Feature
+    - [x] Refactor Home Feature
+    - [x] Refactor Booking Feature
+    - [x] Refactor Diet & Diet Tracking Features
+    - [x] Refactor Progress Feature
+    - [x] Refactor Chat Feature
+    - [x] Refactor Subscription Feature
+- [x] Phase 3: Dashboard & Navigation Integration
+- [x] Verification & Cleanup
