@@ -14,8 +14,8 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Stream<List<MessageEntity>> watchMessages(String conversationId) {
-    return remoteDataSource.watchMessages(conversationId);
+  Stream<List<MessageEntity>> watchMessages(String conversationId, int persId) {
+    return remoteDataSource.watchMessages(conversationId, persId);
   }
 
   @override

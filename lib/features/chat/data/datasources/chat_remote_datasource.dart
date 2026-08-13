@@ -4,7 +4,7 @@ import '../models/message_model.dart';
 
 abstract class ChatRemoteDataSource {
   Stream<List<ConversationModel>> watchConversations(int persId);
-  Stream<List<MessageModel>> watchMessages(String conversationId);
+  Stream<List<MessageModel>> watchMessages(String conversationId, int persId);
   Future<void> sendMessage(int persId, String conversationId, String text, String senderName);
 }
 
@@ -23,15 +23,15 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   }
 
   @override
-  Stream<List<MessageModel>> watchMessages(String conversationId) {
+  Stream<List<MessageModel>> watchMessages(String conversationId, int persId) {
     return _firestore
         .collection('Gym_Conversations')
         .doc(conversationId)
         .collection('Messages')
-        .orderBy('created_at', descending: false)
+        .orderBy('created_at', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => MessageModel.fromJson(doc.data(), doc.id))
+            .map((doc) => MessageModel.fromJson(doc.data(), doc.id, persId))
             .toList());
   }
 

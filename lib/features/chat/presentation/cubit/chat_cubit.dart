@@ -22,7 +22,6 @@ class ChatCubit extends Cubit<ChatState> {
   }) : super(ChatInitial());
 
   Future<void> loadConversations(int persId) async {
-    // Only show loading if we don't have cached data
     if (_cachedConversations.isEmpty) {
       emit(ChatLoading());
     }
@@ -36,8 +35,7 @@ class ChatCubit extends Cubit<ChatState> {
     );
   }
 
-  Future<void> loadMessages(String conversationId) async {
-    // Only show loading if we are switching conversations or don't have messages yet
+  Future<void> loadMessages(String conversationId, int persId) async {
     final currentState = state;
     bool shouldShowLoading = true;
     if (currentState is ChatMessagesLoaded && currentState.conversationId == conversationId) {
@@ -49,7 +47,7 @@ class ChatCubit extends Cubit<ChatState> {
     }
 
     await _messagesSubscription?.cancel();
-    _messagesSubscription = getMessagesUseCase.call(conversationId).listen(
+    _messagesSubscription = getMessagesUseCase.call(conversationId, persId).listen(
       (messages) {
         emit(ChatMessagesLoaded(conversationId, messages, _cachedConversations));
       },
@@ -65,7 +63,6 @@ class ChatCubit extends Cubit<ChatState> {
         text: text,
         senderName: senderName,
       ));
-      // No need to manually reload, stream listener handles it
     } catch (e) {
       emit(ChatError(e.toString()));
     }

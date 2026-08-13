@@ -166,8 +166,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
     return InkWell(
       onTap: () {
-        context.read<ChatCubit>().loadMessages(c.id);
-        Navigator.push(context, MaterialPageRoute(builder: (context) => ChatDetailScreen(conversation: c, lang: widget.lang)));
+        final authState = context.read<AuthCubit>().state;
+        if (authState is Authenticated) {
+          context.read<ChatCubit>().loadMessages(c.id, authState.user.persId!);
+          Navigator.push(context, MaterialPageRoute(builder: (context) => ChatDetailScreen(conversation: c, lang: widget.lang)));
+        }
       },
       borderRadius: BorderRadius.circular(24),
       child: Container(

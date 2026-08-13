@@ -6,7 +6,7 @@ class GetMessagesUseCase {
 
   GetMessagesUseCase(this.repository);
 
-  Stream<List<MessageEntity>> call(String conversationId) {
-    return repository.watchMessages(conversationId);
+  Stream<List<MessageEntity>> call(String conversationId, int persId) {
+    return repository.watchMessages(conversationId, persId);
   }
 }

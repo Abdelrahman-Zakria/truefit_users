@@ -31,6 +31,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   String tr(String key) => Translations.tr(key, widget.lang);
 
   @override
+  void initState() {
+    super.initState();
+    final authState = context.read<AuthCubit>().state;
+    if (authState is Authenticated) {
+      context.read<ChatCubit>().loadMessages(widget.conversation.id, authState.user.persId!);
+    }
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
     _controller.dispose();
@@ -59,6 +68,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is Authenticated) {
+      context.read<ChatCubit>().loadMessages(widget.conversation.id, authState.user.persId!);
+    }
+
     return PopScope(
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
@@ -138,9 +152,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         if (_lastMessages.isNotEmpty) {
           return ListView.builder(
             padding: const EdgeInsets.all(16),
+            reverse: true, // Standard chat behavior: newest at bottom
             itemCount: _lastMessages.length + 1, // +1 for "Today" header
             itemBuilder: (context, index) {
-              if (index == 0) {
+              // In a reversed list, higher index is at the top
+              if (index == _lastMessages.length) {
                 return Center(
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 24),
@@ -150,7 +166,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                 );
               }
-              return _buildMessageGroup(_lastMessages[index - 1]);
+              return _buildMessageGroup(_lastMessages[index]);
             },
           );
         }
