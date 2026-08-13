@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/di/injection_container.dart';
 import 'core/theme/app_theme.dart';
@@ -20,18 +21,76 @@ import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/register_screen.dart';
 import 'features/auth/presentation/screens/pending_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
-import 'core/utils/firestore_seeder.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await initializeDateFormatting();
-  await InjectionContainer.init();
-  
-  // Seed Firestore data for subscription screen
-  //await FirestoreSeeder.seedBookingData();
 
-  runApp(const TrueFitApp());
+  String? initError;
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    initError = "Firebase Error: $e";
+  }
+
+  if (initError == null) {
+    try {
+      await initializeDateFormatting();
+      await InjectionContainer.init();
+    } catch (e) {
+      initError = "Initialization Error: $e";
+    }
+  }
+
+  if (initError != null) {
+    runApp(ErrorApp(error: initError));
+  } else {
+    runApp(const TrueFitApp());
+  }
+}
+
+class ErrorApp extends StatelessWidget {
+  final String error;
+  const ErrorApp({super.key, required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        backgroundColor: const Color(0xFF0A0A0A),
+        body: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 64),
+                const SizedBox(height: 24),
+                const Text(
+                  "Failed to Start App",
+                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  error,
+                  style: const TextStyle(color: Colors.grey, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: () {}, // User can restart app manually
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text("Please contact support or check Firebase config", style: TextStyle(color: Colors.white)),
+                )
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class TrueFitApp extends StatelessWidget {

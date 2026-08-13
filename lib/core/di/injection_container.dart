@@ -58,20 +58,31 @@ import '../../features/subscription/presentation/cubit/subscription_cubit.dart';
 import '../services/objectbox_service.dart';
 
 class InjectionContainer {
-  static late AuthCubit authCubit;
-  static late ProfileCubit profileCubit;
-  static late NotificationsCubit notificationsCubit;
-  static late HomeCubit homeCubit;
-  static late BookingCubit bookingCubit;
-  static late DietCubit dietCubit;
-  static late ProgressCubit progressCubit;
-  static late ChatCubit chatCubit;
-  static late SubscriptionCubit subscriptionCubit;
-  static late ObjectBoxService objectBoxService;
+  static AuthCubit? _authCubit;
+  static ProfileCubit? _profileCubit;
+  static NotificationsCubit? _notificationsCubit;
+  static HomeCubit? _homeCubit;
+  static BookingCubit? _bookingCubit;
+  static DietCubit? _dietCubit;
+  static ProgressCubit? _progressCubit;
+  static ChatCubit? _chatCubit;
+  static SubscriptionCubit? _subscriptionCubit;
+  static ObjectBoxService? _objectBoxService;
+
+  static AuthCubit get authCubit => _authCubit!;
+  static ProfileCubit get profileCubit => _profileCubit!;
+  static NotificationsCubit get notificationsCubit => _notificationsCubit!;
+  static HomeCubit get homeCubit => _homeCubit!;
+  static BookingCubit get bookingCubit => _bookingCubit!;
+  static DietCubit get dietCubit => _dietCubit!;
+  static ProgressCubit get progressCubit => _progressCubit!;
+  static ChatCubit get chatCubit => _chatCubit!;
+  static SubscriptionCubit get subscriptionCubit => _subscriptionCubit!;
+  static ObjectBoxService get objectBoxService => _objectBoxService!;
 
   static Future<void> init() async {
     // Services
-    objectBoxService = await ObjectBoxService.create();
+    _objectBoxService = await ObjectBoxService.create();
 
     // Data sources
     final authRemoteDataSource = AuthRemoteDataSourceImpl();
@@ -136,7 +147,7 @@ class InjectionContainer {
     final subscribeUseCase = SubscribeUseCase(subscriptionRepository);
 
     // Cubits
-    authCubit = AuthCubit(
+    _authCubit = AuthCubit(
       loginUseCase: loginUseCase,
       registerUseCase: registerUseCase,
       logoutUseCase: logoutUseCase,
@@ -144,22 +155,22 @@ class InjectionContainer {
       checkAuthStatusUseCase: checkAuthStatusUseCase,
     );
 
-    profileCubit = ProfileCubit(
+    _profileCubit = ProfileCubit(
       getProfileUseCase: getProfileUseCase,
       updateProfileUseCase: updateProfileUseCase,
     );
 
-    notificationsCubit = NotificationsCubit(
+    _notificationsCubit = NotificationsCubit(
       getNotificationsUseCase: getNotificationsUseCase,
       markNotificationReadUseCase: markNotificationReadUseCase,
       markAllReadUseCase: markAllReadUseCase,
     );
 
-    homeCubit = HomeCubit(
+    _homeCubit = HomeCubit(
       getHomeDataUseCase: getHomeDataUseCase,
     );
 
-    bookingCubit = BookingCubit(
+    _bookingCubit = BookingCubit(
       getCoachesUseCase: getCoachesUseCase,
       getPTOffersUseCase: getPTOffersUseCase,
       getGroupClassesUseCase: getGroupClassesUseCase,
@@ -171,37 +182,37 @@ class InjectionContainer {
       bookSessionUseCase: bookSessionUseCase,
     );
 
-    dietCubit = DietCubit(
+    _dietCubit = DietCubit(
       getDietPlanUseCase: getDietPlanUseCase,
       updateWaterIntakeUseCase: updateWaterIntakeUseCase,
     );
 
-    progressCubit = ProgressCubit(
+    _progressCubit = ProgressCubit(
       getProgressUseCase: getProgressUseCase,
       bookInBodyScanUseCase: bookInBodyScanUseCase,
     );
 
-    chatCubit = ChatCubit(
+    _chatCubit = ChatCubit(
       getConversationsUseCase: getConversationsUseCase,
       getMessagesUseCase: getMessagesUseCase,
       sendMessageUseCase: sendMessageUseCase,
     );
 
-    subscriptionCubit = SubscriptionCubit(
+    _subscriptionCubit = SubscriptionCubit(
       getMembershipPlansUseCase: getMembershipPlansUseCase,
       subscribeUseCase: subscribeUseCase,
     );
   }
 
   static void clearAllData() {
-    authCubit.reset();
-    profileCubit.reset();
-    notificationsCubit.reset();
-    homeCubit.reset();
-    bookingCubit.reset();
-    dietCubit.reset();
-    progressCubit.reset();
-    chatCubit.reset();
-    subscriptionCubit.reset();
+    _authCubit?.reset();
+    _profileCubit?.reset();
+    _notificationsCubit?.reset();
+    _homeCubit?.reset();
+    _bookingCubit?.reset();
+    _dietCubit?.reset();
+    _progressCubit?.reset();
+    _chatCubit?.reset();
+    _subscriptionCubit?.reset();
   }
 }
