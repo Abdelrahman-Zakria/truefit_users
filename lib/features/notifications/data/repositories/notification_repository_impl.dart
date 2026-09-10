@@ -1,24 +1,24 @@
 import '../../domain/entities/notification_entity.dart';
 import '../../domain/repositories/notification_repository.dart';
-import '../datasources/notification_remote_datasource.dart';
+import '../datasources/notification_local_datasource.dart';
 
 class NotificationRepositoryImpl implements NotificationRepository {
-  final NotificationRemoteDataSource remoteDataSource;
+  final NotificationLocalDataSource localDataSource;
 
-  NotificationRepositoryImpl(this.remoteDataSource);
+  NotificationRepositoryImpl(this.localDataSource);
 
   @override
   Future<List<NotificationEntity>> getNotifications() {
-    return remoteDataSource.getNotifications();
+    return localDataSource.getNotifications();
   }
 
   @override
   Future<void> markRead(String id) {
-    return remoteDataSource.markRead(id);
+    return localDataSource.markRead(id);
   }
 
   @override
   Future<void> markAllRead() {
-    return remoteDataSource.markAllRead();
+    return localDataSource.markAllRead();
   }
 }

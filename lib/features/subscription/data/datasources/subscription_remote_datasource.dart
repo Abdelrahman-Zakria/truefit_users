@@ -8,6 +8,16 @@ abstract class SubscriptionRemoteDataSource {
   Future<UserSubscriptionModel?> getUserActiveSubscription(int persId);
   Future<MembershipPlanEntity?> getPlanById(int planId);
   Future<void> subscribe(String planId);
+  Future<void> requestSubscriptionPayment({
+    required int persId,
+    required String userEmail,
+    required String memberName,
+    required String planId,
+    required String planName,
+    required double amount,
+    required String method,
+    String? screenshotUrl,
+  });
 }
 
 class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
@@ -63,5 +73,31 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
   @override
   Future<void> subscribe(String planId) async {
     await Future.delayed(const Duration(seconds: 1));
+  }
+
+  @override
+  Future<void> requestSubscriptionPayment({
+    required int persId,
+    required String userEmail,
+    required String memberName,
+    required String planId,
+    required String planName,
+    required double amount,
+    required String method,
+    String? screenshotUrl,
+  }) async {
+    await _firestore.collection('Pending_Payments').add({
+      'pers_ID': persId,
+      'user_email': userEmail,
+      'member_name': memberName,
+      'type': 'plan',
+      'target_id': planId,
+      'package': planName,
+      'amount': amount,
+      'payment_method': method,
+      'screenshot_url': screenshotUrl,
+      'status': 'pending',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
   }
 }

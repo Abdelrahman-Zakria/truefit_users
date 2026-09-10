@@ -68,9 +68,58 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "2:1585100378291831130",
+      "lastPropertyId": "8:2465704634428643103",
+      "name": "NotificationBoxEntity",
+      "properties": [
+        {
+          "id": "1:6588024480640808356",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:7449515595287205211",
+          "name": "titleEn",
+          "type": 9
+        },
+        {
+          "id": "3:5451981963405478262",
+          "name": "titleAr",
+          "type": 9
+        },
+        {
+          "id": "4:3133388985600453525",
+          "name": "bodyEn",
+          "type": 9
+        },
+        {
+          "id": "5:7917688099994845299",
+          "name": "bodyAr",
+          "type": 9
+        },
+        {
+          "id": "6:7883411465101177701",
+          "name": "type",
+          "type": 9
+        },
+        {
+          "id": "7:6995928167483869432",
+          "name": "timestamp",
+          "type": 10
+        },
+        {
+          "id": "8:2465704634428643103",
+          "name": "isRead",
+          "type": 1
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "1:237031838721780581",
+  "lastEntityId": "2:1585100378291831130",
   "lastIndexId": "1:8893327681051370746",
   "lastRelationId": "0:0",
   "lastSequenceId": "0:0",

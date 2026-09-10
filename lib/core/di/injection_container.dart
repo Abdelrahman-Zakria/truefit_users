@@ -11,7 +11,7 @@ import '../../features/profile/data/repositories/profile_repository_impl.dart';
 import '../../features/profile/domain/usecases/get_profile_usecase.dart';
 import '../../features/profile/domain/usecases/update_profile_usecase.dart';
 import '../../features/profile/presentation/cubit/profile_cubit.dart';
-import '../../features/notifications/data/datasources/notification_remote_datasource.dart';
+import '../../features/notifications/data/datasources/notification_local_datasource.dart';
 import '../../features/notifications/data/repositories/notification_repository_impl.dart';
 import '../../features/notifications/domain/usecases/get_notifications_usecase.dart';
 import '../../features/notifications/domain/usecases/mark_notification_read_usecase.dart';
@@ -56,6 +56,7 @@ import '../../features/subscription/domain/usecases/get_membership_plans_usecase
 import '../../features/subscription/domain/usecases/subscribe_usecase.dart';
 import '../../features/subscription/presentation/cubit/subscription_cubit.dart';
 import '../services/objectbox_service.dart';
+import '../services/notification_service.dart';
 
 class InjectionContainer {
   static AuthCubit? _authCubit;
@@ -68,6 +69,7 @@ class InjectionContainer {
   static ChatCubit? _chatCubit;
   static SubscriptionCubit? _subscriptionCubit;
   static ObjectBoxService? _objectBoxService;
+  static NotificationService? _notificationService;
 
   static AuthCubit get authCubit => _authCubit!;
   static ProfileCubit get profileCubit => _profileCubit!;
@@ -79,15 +81,18 @@ class InjectionContainer {
   static ChatCubit get chatCubit => _chatCubit!;
   static SubscriptionCubit get subscriptionCubit => _subscriptionCubit!;
   static ObjectBoxService get objectBoxService => _objectBoxService!;
+  static NotificationService get notificationService => _notificationService!;
 
   static Future<void> init() async {
     // Services
     _objectBoxService = await ObjectBoxService.create();
+    _notificationService = NotificationService();
+    await _notificationService!.init();
 
     // Data sources
     final authRemoteDataSource = AuthRemoteDataSourceImpl();
     final profileRemoteDataSource = ProfileRemoteDataSourceImpl();
-    final notificationRemoteDataSource = NotificationRemoteDataSourceImpl();
+    final notificationLocalDataSource = NotificationLocalDataSourceImpl(_objectBoxService!);
     final homeRemoteDataSource = HomeRemoteDataSourceImpl();
     final bookingRemoteDataSource = BookingRemoteDataSourceImpl();
     final dietRemoteDataSource = DietRemoteDataSourceImpl();
@@ -98,7 +103,7 @@ class InjectionContainer {
     // Repositories
     final authRepository = AuthRepositoryImpl(authRemoteDataSource);
     final profileRepository = ProfileRepositoryImpl(profileRemoteDataSource);
-    final notificationRepository = NotificationRepositoryImpl(notificationRemoteDataSource);
+    final notificationRepository = NotificationRepositoryImpl(notificationLocalDataSource);
     final homeRepository = HomeRepositoryImpl(homeRemoteDataSource);
     final bookingRepository = BookingRepositoryImpl(bookingRemoteDataSource);
     final dietRepository = DietRepositoryImpl(dietRemoteDataSource);

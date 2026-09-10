@@ -19,6 +19,7 @@ class BookingLoaded extends BookingState {
   final List<PTOfferEntity> ptOffers;
   final List<PTWalletEntity> userWallets;
   final List<Map<String, dynamic>> userBookings;
+  final List<Map<String, dynamic>> pendingPayments;
 
   const BookingLoaded({
     required this.coaches,
@@ -26,10 +27,11 @@ class BookingLoaded extends BookingState {
     required this.ptOffers,
     required this.userWallets,
     required this.userBookings,
+    required this.pendingPayments,
   });
 
   @override
-  List<Object?> get props => [coaches, groupClasses, ptOffers, userWallets, userBookings];
+  List<Object?> get props => [coaches, groupClasses, ptOffers, userWallets, userBookings, pendingPayments];
 }
 
 class BookingError extends BookingState {

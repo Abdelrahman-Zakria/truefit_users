@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/intl/translations.dart';
+import '../../../../core/widgets/payment_selection_step.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../domain/entities/outdoor_session_entity.dart';
 import '../../domain/entities/home_offer_entity.dart';
 import '../../domain/entities/home_package_entity.dart';
+import '../../../booking/presentation/cubit/booking_cubit.dart';
+import '../../../booking/presentation/cubit/booking_state.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class HomeModalWrapper extends StatelessWidget {
   final String title;
@@ -56,77 +62,159 @@ class HomeModalWrapper extends StatelessWidget {
   }
 }
 
-class OutdoorSessionDetailModal extends StatelessWidget {
+class OutdoorSessionDetailModal extends StatefulWidget {
   final OutdoorSessionEntity session;
   final String lang;
   final VoidCallback onBook;
 
   const OutdoorSessionDetailModal({super.key, required this.session, required this.lang, required this.onBook});
 
-  String tr(String key) => Translations.tr(key, lang);
+  @override
+  State<OutdoorSessionDetailModal> createState() => _OutdoorSessionDetailModalState();
+}
+
+class _OutdoorSessionDetailModalState extends State<OutdoorSessionDetailModal> {
+  int _step = 0; // 0: detail, 1: payment, 2: success
+
+  String tr(String key) => Translations.tr(key, widget.lang);
 
   @override
   Widget build(BuildContext context) {
-    final title = session.title[lang] ?? session.title['en']!;
-    final instructor = session.instructor[lang] ?? session.instructor['en']!;
-    final isFull = session.spots == 0;
+    final title = widget.session.title[widget.lang] ?? widget.session.title['en']!;
+    final instructor = widget.session.instructor[widget.lang] ?? widget.session.instructor['en']!;
+    final isFull = widget.session.spots == 0;
 
     return HomeModalWrapper(
-      title: tr('sessionDetails'),
-      lang: lang,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: AppTheme.primaryRed.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)),
-                  child: Text(tr('noMembershipRequired'), style: const TextStyle(color: AppTheme.primaryRed, fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-                if (isFull) ...[
-                  const SizedBox(width: 8),
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Text(tr('sessionFull'), style: const TextStyle(color: Colors.grey, fontSize: 10))),
-                ],
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-            Text('${tr('instructor')}: $instructor', style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
-            const SizedBox(height: 24),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 2.2,
-              children: [
-                _buildInfoCard(LucideIcons.mapPin, tr('location'), session.location[lang] ?? session.location['en']!),
-                _buildInfoCard(LucideIcons.calendar, tr('date'), session.date),
-                _buildInfoCard(LucideIcons.clock, tr('time'), session.time),
-                _buildInfoCard(LucideIcons.clock, tr('duration'), session.duration),
-                _buildInfoCard(LucideIcons.users, tr('capacity'), '${session.spots} ${tr('spotsLeft')}'),
-                _buildInfoCard(LucideIcons.tag, tr('price'), session.price == 0 ? tr('free') : '${session.price.toInt()} LE'),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Text(tr('aboutSession'), style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(session.about[lang] ?? session.about['en']!, style: const TextStyle(color: Color(0xFFD1D5DB), fontSize: 14, height: 1.5)),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: isFull ? null : onBook,
-                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed, foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF2A2A2A), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                child: Text(isFull ? tr('sessionFull') : tr('joinSession'), style: const TextStyle(fontWeight: FontWeight.bold)),
+      title: _step == 1 ? tr('paymentDetails') : tr('sessionDetails'),
+      lang: widget.lang,
+      child: BlocConsumer<BookingCubit, BookingState>(
+        listener: (context, state) {
+          if (state is BookingSuccess && _step == 1) {
+            setState(() => _step = 2);
+          }
+        },
+        builder: (context, state) {
+          if (_step == 0) return _buildDetailStep(title, instructor, isFull);
+          if (_step == 1) return _buildPaymentStep(title);
+          return _buildSuccessStep(title, instructor);
+        },
+      ),
+    );
+  }
+
+  Widget _buildDetailStep(String title, String instructor, bool isFull) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: AppTheme.primaryRed.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)),
+                child: Text(tr('noMembershipRequired'), style: const TextStyle(color: AppTheme.primaryRed, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
+              if (isFull) ...[
+                const SizedBox(width: 8),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Text(tr('sessionFull'), style: const TextStyle(color: Colors.grey, fontSize: 10))),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          Text('${tr('instructor')}: $instructor', style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
+          const SizedBox(height: 24),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 2.2,
+            children: [
+              _buildInfoCard(LucideIcons.mapPin, tr('location'), widget.session.location[widget.lang] ?? widget.session.location['en']!),
+              _buildInfoCard(LucideIcons.calendar, tr('date'), widget.session.date),
+              _buildInfoCard(LucideIcons.clock, tr('time'), widget.session.time),
+              _buildInfoCard(LucideIcons.clock, tr('duration'), widget.session.duration),
+              _buildInfoCard(LucideIcons.users, tr('capacity'), '${widget.session.spots} ${tr('spotsLeft')}'),
+              _buildInfoCard(LucideIcons.tag, tr('price'), widget.session.price == 0 ? tr('free') : '${widget.session.price.toInt()} LE'),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Text(tr('aboutSession'), style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(widget.session.about[widget.lang] ?? widget.session.about['en']!, style: const TextStyle(color: Color(0xFFD1D5DB), fontSize: 14, height: 1.5)),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: isFull ? null : () => setState(() => _step = 1),
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed, foregroundColor: Colors.white, disabledBackgroundColor: const Color(0xFF2A2A2A), padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              child: Text(isFull ? tr('sessionFull') : tr('joinSession'), style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentStep(String title) {
+    final authState = context.read<AuthCubit>().state;
+    int persId = 0;
+    String email = "Guest";
+    String memberName = "Guest User";
+
+    if (authState is Authenticated) {
+      persId = authState.user.persId ?? 0;
+      email = authState.user.email ?? "";
+      memberName = authState.user.displayName ?? authState.user.nameEn ?? authState.user.nameAr ?? "Member";
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: PaymentSelectionStep(
+        lang: widget.lang,
+        amount: widget.session.price,
+        itemName: title,
+        onCompleted: (method, screenshotUrl) {
+          context.read<BookingCubit>().requestPayment(
+            persId: persId,
+            email: email,
+            memberName: memberName,
+            type: 'class',
+            targetId: widget.session.id,
+            coachName: widget.session.instructor[widget.lang] ?? widget.session.instructor['en'] ?? '',
+            packageDetails: "Outdoor Session: $title",
+            amount: widget.session.price,
+            method: method,
+            screenshotUrl: screenshotUrl,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSuccessStep(String title, String instructor) {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Container(width: 80, height: 80, decoration: BoxDecoration(color: AppTheme.primaryRed.withValues(alpha: 0.1), shape: BoxShape.circle), child: const Icon(LucideIcons.check, color: AppTheme.primaryRed, size: 40)),
+          const SizedBox(height: 24),
+          Text(tr('allSet'), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(tr('paymentSubmitted'), style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14), textAlign: TextAlign.center),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              child: Text(tr('done'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
       ),
     );
   }

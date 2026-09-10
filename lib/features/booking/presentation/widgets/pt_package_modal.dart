@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/intl/translations.dart';
+import '../../../../core/widgets/payment_selection_step.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../domain/entities/coach_entity.dart';
 import '../../domain/entities/pt_offer_entity.dart';
+import '../cubit/booking_cubit.dart';
+import '../cubit/booking_state.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class PTPackageModal extends StatefulWidget {
   final String lang;
@@ -107,9 +113,18 @@ class _PTPackageModalState extends State<PTPackageModal> {
   }
 
   Widget _buildStepContent() {
-    if (_currentStep == 0) return _buildPackageStep();
-    if (_currentStep == 1) return _buildPaymentStep();
-    return _buildSuccessStep();
+    return BlocConsumer<BookingCubit, BookingState>(
+      listener: (context, state) {
+        if (state is BookingSuccess && _currentStep == 1) {
+          setState(() => _currentStep = 2);
+        }
+      },
+      builder: (context, state) {
+        if (_currentStep == 0) return _buildPackageStep();
+        if (_currentStep == 1) return _buildPaymentStep();
+        return _buildSuccessStep();
+      },
+    );
   }
 
   Widget _buildPackageStep() {
@@ -158,40 +173,36 @@ class _PTPackageModalState extends State<PTPackageModal> {
   }
 
   Widget _buildPaymentStep() {
-    final total = _selectedOffer.price;
+    final authState = context.read<AuthCubit>().state;
+    int persId = 0;
+    String email = "Guest";
+    String memberName = "Guest User";
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: AppTheme.primaryRed.withValues(alpha:0.1), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.primaryRed.withValues(alpha:0.3))),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(children: [const Icon(LucideIcons.user, size: 16, color: AppTheme.primaryRed), const SizedBox(width: 8), Text("${widget.coach.name} · ${_selectedOffer.sessions} ${tr('sessions')}", style: const TextStyle(color: Colors.white, fontSize: 13))]),
-              Text("${total.toInt()} LE", style: const TextStyle(color: AppTheme.primaryRed, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        _buildTextField(tr('nameOnCard'), "John Doe", _cardNameController, LucideIcons.user),
-        const SizedBox(height: 16),
-        _buildTextField(tr('cardNumber'), "0000 0000 0000 0000", _cardNumberController, LucideIcons.creditCard),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: _buildTextField(tr('expiry'), "MM/YY", _expiryController, LucideIcons.calendar)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildTextField("CVV", "123", _cvvController, LucideIcons.lock)),
-          ],
-        ),
-        const SizedBox(height: 24),
-        _buildActionButton("${tr('pay')} ${total.toInt()} LE", () {
-          widget.onBuy(_selectedOffer.sessions);
-          setState(() => _currentStep++);
-        }),
-      ],
+    if (authState is Authenticated) {
+      persId = authState.user.persId ?? 0;
+      email = authState.user.email ?? "";
+      memberName = authState.user.displayName ?? authState.user.nameEn ?? authState.user.nameAr ?? "Member";
+    }
+
+    return PaymentSelectionStep(
+      lang: widget.lang,
+      amount: _selectedOffer.price,
+      itemName: "${widget.coach.name} - ${_selectedOffer.sessions} sessions",
+      onCompleted: (method, screenshotUrl) {
+        context.read<BookingCubit>().requestPayment(
+          persId: persId,
+          email: email,
+          memberName: memberName,
+          type: 'pt',
+          targetId: widget.coach.id,
+          coachId: widget.coach.id,
+          coachName: widget.coach.name,
+          packageDetails: "${_selectedOffer.sessions} sessions",
+          amount: _selectedOffer.price,
+          method: method,
+          screenshotUrl: screenshotUrl,
+        );
+      },
     );
   }
 
@@ -237,9 +248,9 @@ class _PTPackageModalState extends State<PTPackageModal> {
   Widget _buildActionButton(String label, VoidCallback onPressed) {
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(
+      child: FilledButton(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
+        style: FilledButton.styleFrom(
           backgroundColor: AppTheme.primaryRed,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 18),

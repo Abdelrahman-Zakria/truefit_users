@@ -6,6 +6,8 @@ import '../../../../core/intl/translations.dart';
 import '../../../../core/widgets/guest_locked_view.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
+import '../../../subscription/presentation/cubit/subscription_cubit.dart';
+import '../../../subscription/presentation/cubit/subscription_state.dart';
 import '../cubit/booking_cubit.dart';
 import '../cubit/booking_state.dart';
 import '../../domain/entities/pt_wallet_entity.dart';
@@ -49,58 +51,117 @@ class _BookingScreenState extends State<BookingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.isGuest) {
-      return GuestLockedView(
-        icon: LucideIcons.calendar,
-        featureKey: tr('lockBooking'),
-        onJoinNow: widget.onJoinNow,
-        lang: widget.lang,
-      );
-    }
+    return BlocBuilder<SubscriptionCubit, SubscriptionState>(
+      builder: (context, subState) {
+        return BlocBuilder<BookingCubit, BookingState>(
+          builder: (context, state) {
+            final authState = context.watch<AuthCubit>().state;
+            final int? persId = authState is Authenticated ? authState.user.persId : null;
 
-    return BlocBuilder<BookingCubit, BookingState>(
-      builder: (context, state) {
-        final authState = context.watch<AuthCubit>().state;
-        final int? persId = authState is Authenticated ? authState.user.persId : null;
-
-        if (state is BookingInitial && persId != null) {
-          context.read<BookingCubit>().loadBookingData(persId);
-        }
-
-        return Scaffold(
-          backgroundColor: AppTheme.backgroundBlack,
-          body: RefreshIndicator(
-            onRefresh: () async {
+            if (state is BookingInitial) {
               if (persId != null) {
-                await context.read<BookingCubit>().loadBookingData(persId);
+                context.read<BookingCubit>().loadBookingData(persId);
+              } else {
+                // Guests can still load data
+                context.read<BookingCubit>().loadBookingData(0); 
               }
-            },
-            color: AppTheme.primaryRed,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(),
-                    const SizedBox(height: 24),
-                    if (state is BookingLoaded) ...[
-                      _buildMyBookings(state),
-                      const SizedBox(height: 24),
-                    ],
-                    _buildTabs(),
-                    const SizedBox(height: 24),
-                    _buildBody(context, state, persId),
-                    const SizedBox(height: 40),
-                  ],
+            }
+
+            return Scaffold(
+              backgroundColor: AppTheme.backgroundBlack,
+              body: RefreshIndicator(
+                onRefresh: () async {
+                  if (persId != null) {
+                    await context.read<BookingCubit>().loadBookingData(persId);
+                    await context.read<SubscriptionCubit>().loadMembershipPlans(persId: persId);
+                  }
+                },
+                color: AppTheme.primaryRed,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(),
+                        const SizedBox(height: 16),
+                        if (!widget.isGuest) _buildSubscriptionStatus(subState),
+                        const SizedBox(height: 24),
+                        if (state is BookingLoaded) ...[
+                          _buildMyBookings(state),
+                          const SizedBox(height: 24),
+                        ],
+                        _buildTabs(),
+                        const SizedBox(height: 24),
+                        _buildBody(context, state, persId, subState),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
+  }
+
+  Widget _buildSubscriptionStatus(SubscriptionState state) {
+    if (state is SubscriptionPlansLoaded && state.userSubscription != null) {
+      final status = state.userSubscription!.status;
+      Color statusColor;
+      String statusText;
+      IconData statusIcon;
+
+      switch (status) {
+        case 1: // Active
+          statusColor = Colors.green;
+          statusText = tr('subActive');
+          statusIcon = LucideIcons.checkCircle;
+          break;
+        case 2: // Pending
+          statusColor = Colors.orange;
+          statusText = tr('subPending');
+          statusIcon = LucideIcons.clock;
+          break;
+        default: // 0 or other: Ended
+          statusColor = Colors.red;
+          statusText = tr('subEnded');
+          statusIcon = LucideIcons.alertCircle;
+      }
+
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: statusColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(statusIcon, color: statusColor, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(tr('subscriptionStatus'), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  Text(statusText, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                  if (status == 2) 
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(tr('waitingForGymApproval'), style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11)),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return const SizedBox();
   }
 
   Widget _buildHeader() {
@@ -149,15 +210,15 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
-  Widget _buildBody(BuildContext context, BookingState state, int? persId) {
+  Widget _buildBody(BuildContext context, BookingState state, int? persId, SubscriptionState subState) {
     if (state is BookingLoading) {
       return const BookingSkeleton();
     }
 
     if (state is BookingLoaded) {
       return _activeTab == 0 
-        ? _buildPTList(context, state, persId) 
-        : _buildClassesList(context, state, persId);
+        ? _buildPTList(context, state, persId, subState) 
+        : _buildClassesList(context, state, persId, subState);
     }
 
     if (state is BookingError) {
@@ -167,7 +228,7 @@ class _BookingScreenState extends State<BookingScreen> {
     return const SizedBox();
   }
 
-  Widget _buildPTList(BuildContext context, BookingLoaded state, int? persId) {
+  Widget _buildPTList(BuildContext context, BookingLoaded state, int? persId, SubscriptionState subState) {
     // Sort coaches: those with active sessions first
     final sortedCoaches = List<CoachEntity>.from(state.coaches);
     sortedCoaches.sort((a, b) {
@@ -184,16 +245,26 @@ class _BookingScreenState extends State<BookingScreen> {
       children: [
         Text(tr('availableTrainers'), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        ...sortedCoaches.map((c) => _buildCoachCard(context, c, state, persId)),
+        ...sortedCoaches.map((c) => _buildCoachCard(context, c, state, persId, subState)),
       ],
     );
   }
 
-  Widget _buildCoachCard(BuildContext context, CoachEntity c, BookingLoaded state, int? persId) {
+  Widget _buildCoachCard(BuildContext context, CoachEntity c, BookingLoaded state, int? persId, SubscriptionState subState) {
     final PTWalletEntity wallet = (state.userWallets as Iterable<PTWalletEntity>).firstWhere((w) => w.coachId == c.id, orElse: () => const PTWalletEntity(persId: 0, coachId: '', total: 0, sessionsLeft: 0));
     final hasSessions = wallet.sessionsLeft > 0;
+    
+    final hasPendingPayment = state.pendingPayments.any((p) => p['type'] == 'pt' && p['target_id'] == c.id);
+
     final initials = c.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').join('').toUpperCase();
     final specialty = c.specialty[widget.lang] ?? c.specialty['en'] ?? '';
+
+    bool isSubActive = false;
+    int subStatus = 0;
+    if (subState is SubscriptionPlansLoaded && subState.userSubscription != null) {
+      subStatus = subState.userSubscription!.status;
+      isSubActive = subStatus == 1;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -231,25 +302,42 @@ class _BookingScreenState extends State<BookingScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: persId == null ? null : () {
+              onPressed: hasPendingPayment ? null : () {
                 if (hasSessions) {
+                  // Only allow scheduling if sub is active
+                  if (!isSubActive) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(subStatus == 2 ? tr('waitingForGymApproval') : (tr('subEnded') + ". " + tr('renewNow')))),
+                    );
+                    return;
+                  }
                   _showSheet(PTSchedulingSheet(
                     lang: widget.lang, 
                     coach: c, 
-                    persId: persId, 
-                    onSchedule: (date, time) => context.read<BookingCubit>().scheduleSession(persId, c.id, date, time)
+                    persId: persId ?? 0, 
+                    onSchedule: (date, time) => context.read<BookingCubit>().scheduleSession(persId ?? 0, c.id, date, time)
                   ));
                 } else {
                   _showSheet(PTPackageModal(
                     lang: widget.lang, 
                     coach: c, 
                     offers: state.ptOffers, 
-                    onBuy: (sessions) => context.read<BookingCubit>().buyPackage(persId, c.id, sessions)
+                    onBuy: (sessions) => context.read<BookingCubit>().buyPackage(persId ?? 0, c.id, sessions)
                   ));
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-              child: Text(hasSessions ? tr('scheduleSession') : tr('buyPackage') ?? "Buy Package", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: hasPendingPayment ? Colors.orange : AppTheme.primaryRed, 
+                disabledBackgroundColor: hasPendingPayment ? Colors.orange.withValues(alpha: 0.2) : const Color(0xFF2A2A2A),
+                padding: const EdgeInsets.symmetric(vertical: 12), 
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+              ),
+              child: Text(
+                hasPendingPayment 
+                  ? tr('subPending') 
+                  : (hasSessions ? tr('scheduleSession') : tr('buyPackage') ?? "Buy Package"), 
+                style: TextStyle(color: hasPendingPayment ? Colors.orange : Colors.white, fontWeight: FontWeight.bold)
+              ),
             ),
           ),
         ],
@@ -257,21 +345,30 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
-  Widget _buildClassesList(BuildContext context, BookingLoaded state, int? persId) {
+  Widget _buildClassesList(BuildContext context, BookingLoaded state, int? persId, SubscriptionState subState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(tr('upcomingClasses'), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        ...state.groupClasses.map((c) => _buildClassCard(context, c, persId)),
+        ...state.groupClasses.map((c) => _buildClassCard(context, c, state, persId, subState)),
       ],
     );
   }
 
-  Widget _buildClassCard(BuildContext context, GroupClassEntity c, int? persId) {
+  Widget _buildClassCard(BuildContext context, GroupClassEntity c, BookingLoaded state, int? persId, SubscriptionState subState) {
     final isFull = c.spotsLeft == '0';
     final name = c.name[widget.lang] ?? c.name['en'] ?? '';
     final instructor = c.instructor[widget.lang] ?? c.instructor['en'] ?? '';
+
+    final hasPendingPayment = state.pendingPayments.any((p) => p['type'] == 'class' && p['target_id'] == c.id);
+
+    bool isSubActive = false;
+    int subStatus = 0;
+    if (subState is SubscriptionPlansLoaded && subState.userSubscription != null) {
+      subStatus = subState.userSubscription!.status;
+      isSubActive = subStatus == 1;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -311,13 +408,29 @@ class _BookingScreenState extends State<BookingScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: (isFull || persId == null) ? null : () => _showSheet(ClassBookingSheet(
-                classItem: c, 
-                lang: widget.lang, 
-                onBook: (id) => context.read<BookingCubit>().bookGroupClass(persId, id)
-              )),
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed, disabledBackgroundColor: const Color(0xFF2A2A2A), padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-              child: Text(isFull ? tr('sessionFull') : tr('bookNow'), style: TextStyle(color: isFull ? Colors.grey : Colors.white, fontWeight: FontWeight.bold)),
+              onPressed: (isFull || hasPendingPayment) ? null : () {
+                if (!isSubActive) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(subStatus == 2 ? tr('waitingForGymApproval') : (tr('subEnded') + ". " + tr('renewNow')))),
+                  );
+                  return;
+                }
+                _showSheet(ClassBookingSheet(
+                  classItem: c, 
+                  lang: widget.lang, 
+                  onBook: (id) => context.read<BookingCubit>().bookGroupClass(persId ?? 0, id)
+                ));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: hasPendingPayment ? Colors.orange : AppTheme.primaryRed, 
+                disabledBackgroundColor: hasPendingPayment ? Colors.orange.withValues(alpha: 0.2) : const Color(0xFF2A2A2A), 
+                padding: const EdgeInsets.symmetric(vertical: 12), 
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+              ),
+              child: Text(
+                hasPendingPayment ? tr('subPending') : (isFull ? tr('sessionFull') : tr('bookNow')), 
+                style: TextStyle(color: hasPendingPayment ? Colors.orange : Colors.white, fontWeight: FontWeight.bold)
+              ),
             ),
           ),
         ],

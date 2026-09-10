@@ -67,7 +67,8 @@ class SubscriptionScreen extends StatelessWidget {
                       context, 
                       state.plans,
                       state.activePlan ?? MembershipPlanEntity(id: '0', name: const {'en': 'Member', 'ar': 'عضو'}, price: '0', features: const {}, isPopular: false), 
-                      state.userSubscription?.toDate
+                      state.userSubscription?.toDate,
+                      state,
                     ),
                   if (!isGuest) _buildSavedCards(state.userSubscription),
                   _buildBody(context, state),
@@ -104,7 +105,7 @@ class SubscriptionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCurrentPlan(BuildContext context, List<MembershipPlanEntity> allPlans, MembershipPlanEntity plan, String? expiryDate) {
+  Widget _buildCurrentPlan(BuildContext context, List<MembershipPlanEntity> allPlans, MembershipPlanEntity plan, String? expiryDate, SubscriptionPlansLoaded state) {
     String formattedExpiry = expiryDate ?? '—';
     try {
       if (expiryDate != null) {
@@ -114,6 +115,23 @@ class SubscriptionScreen extends StatelessWidget {
     } catch (_) {}
 
     final planName = plan.name[lang] ?? plan.name['en'] ?? tr('member');
+    final status = state.userSubscription?.status ?? 0;
+    
+    Color statusColor;
+    String statusText;
+    switch (status) {
+      case 1:
+        statusColor = Colors.green;
+        statusText = tr('subActive');
+        break;
+      case 2:
+        statusColor = Colors.orange;
+        statusText = tr('subPending');
+        break;
+      default:
+        statusColor = Colors.red;
+        statusText = tr('subEnded');
+    }
 
     return Container(
       margin: const EdgeInsets.all(20),
@@ -138,8 +156,8 @@ class SubscriptionScreen extends StatelessWidget {
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.green.withValues(alpha: 0.3))),
-                child: Text(tr('active'), style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: statusColor.withValues(alpha: 0.3))),
+                child: Text(statusText, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
             ],
           ),

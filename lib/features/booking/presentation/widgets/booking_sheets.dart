@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/intl/translations.dart';
+import '../../../../core/widgets/payment_selection_step.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../domain/entities/pt_session_entity.dart';
 import '../../domain/entities/group_class_entity.dart';
+import '../cubit/booking_cubit.dart';
+import '../cubit/booking_state.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class BookingSheetWrapper extends StatelessWidget {
   final String title;
@@ -245,9 +251,14 @@ class _PTBookingSheetState extends State<PTBookingSheet> {
         const SizedBox(height: 32),
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton(
+          child: FilledButton(
             onPressed: _selectedTime != null ? () => setState(() => _step = 2) : null,
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primaryRed,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -291,9 +302,14 @@ class _PTBookingSheetState extends State<PTBookingSheet> {
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton(
+          child: FilledButton(
             onPressed: () => setState(() => _step = 3),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primaryRed,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             child: Text(tr('confirmBooking'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ),
@@ -363,12 +379,17 @@ class _PTBookingSheetState extends State<PTBookingSheet> {
           const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
+            child: FilledButton(
               onPressed: () {
                 widget.onBook(widget.session.id);
                 Navigator.pop(context);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primaryRed,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
               child: Text(tr('done'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),
@@ -400,83 +421,133 @@ class ClassBookingSheet extends StatefulWidget {
 }
 
 class _ClassBookingSheetState extends State<ClassBookingSheet> {
-  int _step = 1;
+  double _step = 1;
 
   String tr(String key) => Translations.tr(key, widget.lang);
 
   @override
   Widget build(BuildContext context) {
-    if (_step == 2) {
-      return BookingSheetWrapper(
-        title: tr('youAreIn'),
-        lang: widget.lang,
-        child: _buildSuccess(),
-      );
-    }
+    return BlocConsumer<BookingCubit, BookingState>(
+      listener: (context, state) {
+        if (state is BookingSuccess && _step == 1.5) {
+          setState(() => _step = 2);
+        }
+      },
+      builder: (context, state) {
+        if (_step == 2) {
+          return BookingSheetWrapper(
+            title: tr('youAreIn'),
+            lang: widget.lang,
+            child: _buildSuccess(),
+          );
+        }
 
-    final className = widget.classItem.name[widget.lang] ?? widget.classItem.name['en'] ?? '';
+        final className = widget.classItem.name[widget.lang] ?? widget.classItem.name['en'] ?? '';
 
-    return BookingSheetWrapper(
-      title: tr('confirmBooking'),
-      lang: widget.lang,
-      child: SingleChildScrollView(
-        child: Padding(
+        return BookingSheetWrapper(
+          title: _step == 1 ? tr('confirmBooking') : tr('paymentDetails'),
+          lang: widget.lang,
+          onBack: _step == 1.5 ? () => setState(() => _step = 1) : null,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: _step == 1 ? _buildConfirmStep(className) : _buildPaymentStep(className),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildConfirmStep(String className) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
           padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [AppTheme.primaryRed.withValues(alpha: 0.2), AppTheme.primaryRed.withValues(alpha: 0.05)]),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.3)),
+          ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [AppTheme.primaryRed.withValues(alpha: 0.2), AppTheme.primaryRed.withValues(alpha: 0.05)]),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(className, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text("with ${widget.classItem.instructor}", style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF2A2A2A))),
-                child: Column(
-                  children: [
-                    _buildConfirmRow(tr('date'), widget.classItem.date, LucideIcons.calendar),
-                    const Divider(color: Color(0xFF2A2A2A), height: 1),
-                    _buildConfirmRow(tr('time'), widget.classItem.time, LucideIcons.clock),
-                    const Divider(color: Color(0xFF2A2A2A), height: 1),
-                    _buildConfirmRow(tr('duration'), widget.classItem.duration, null),
-                    const Divider(color: Color(0xFF2A2A2A), height: 1),
-                    _buildConfirmRow(tr('location'), widget.classItem.studio, LucideIcons.mapPin),
-                    const Divider(color: Color(0xFF2A2A2A), height: 1),
-                    _buildConfirmRow(tr('spotsLeft'), "${widget.classItem.spotsLeft} ${tr('spotsLeftText')}", LucideIcons.users),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: AppTheme.primaryRed.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.3))),
-                child: Text(tr('cancelNoticeClass'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => setState(() => _step = 2),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                  child: Text(tr('confirmBooking'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ),
+              Text(className, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text("with ${widget.classItem.instructor[widget.lang] ?? widget.classItem.instructor['en'] ?? ''}", style: const TextStyle(color: Colors.grey, fontSize: 14)),
             ],
           ),
         ),
-      ),
+        const SizedBox(height: 24),
+        Container(
+          decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF2A2A2A))),
+          child: Column(
+            children: [
+              _buildConfirmRow(tr('date'), widget.classItem.date, LucideIcons.calendar),
+              const Divider(color: Color(0xFF2A2A2A), height: 1),
+              _buildConfirmRow(tr('time'), widget.classItem.time, LucideIcons.clock),
+              const Divider(color: Color(0xFF2A2A2A), height: 1),
+              _buildConfirmRow(tr('duration'), widget.classItem.duration, null),
+              const Divider(color: Color(0xFF2A2A2A), height: 1),
+              _buildConfirmRow(tr('location'), widget.classItem.studio, LucideIcons.mapPin),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: AppTheme.primaryRed.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.3))),
+          child: Text(tr('cancelNoticeClass'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: () => setState(() => _step = 1.5),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primaryRed,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(tr('continueToPayment'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentStep(String className) {
+    final authState = context.read<AuthCubit>().state;
+    int persId = 0;
+    String email = "Guest";
+    String memberName = "Guest User";
+
+    if (authState is Authenticated) {
+      persId = authState.user.persId ?? 0;
+      email = authState.user.email ?? "";
+      memberName = authState.user.displayName ?? authState.user.nameEn ?? authState.user.nameAr ?? "Member";
+    }
+
+    return PaymentSelectionStep(
+      lang: widget.lang,
+      amount: 150.0, // Assuming a default price for classes if not specified
+      itemName: className,
+      onCompleted: (method, screenshotUrl) {
+        context.read<BookingCubit>().requestPayment(
+          persId: persId,
+          email: email,
+          memberName: memberName,
+          type: 'class',
+          targetId: widget.classItem.id,
+          coachName: widget.classItem.instructor[widget.lang] ?? widget.classItem.instructor['en'] ?? '',
+          packageDetails: "Group Class: $className",
+          amount: 150.0,
+          method: method,
+          screenshotUrl: screenshotUrl,
+        );
+      },
     );
   }
 
@@ -551,12 +622,18 @@ class _ClassBookingSheetState extends State<ClassBookingSheet> {
           const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
+            child: FilledButton(
               onPressed: () {
-                widget.onBook(widget.classItem.id);
+                // Booking record creation will be handled by admin after payment verification
+                // but we can still emit local success to close the modal
                 Navigator.pop(context);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primaryRed,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
               child: Text(tr('done'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),

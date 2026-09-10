@@ -22,6 +22,21 @@ abstract class BookingRemoteDataSource {
   Future<void> schedulePTSession(int persId, String coachId, String date, String time);
   
   Stream<List<Map<String, dynamic>>> watchUserBookings(int persId);
+  Stream<List<Map<String, dynamic>>> watchPendingPayments(int persId);
+
+  Future<void> requestBookingPayment({
+    required int persId,
+    required String userEmail,
+    required String memberName,
+    required String type,
+    required String targetId,
+    String? coachId,
+    String? coachName,
+    String? packageDetails,
+    required double amount,
+    required String method,
+    String? screenshotUrl,
+  });
 }
 
 class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
@@ -166,5 +181,45 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
         .where('pers_ID', isEqualTo: persId)
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList());
+  }
+
+  @override
+  Stream<List<Map<String, dynamic>>> watchPendingPayments(int persId) {
+    return _firestore
+        .collection('Pending_Payments')
+        .where('pers_ID', isEqualTo: persId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList());
+  }
+
+  Future<void> requestBookingPayment({
+    required int persId,
+    required String userEmail,
+    required String memberName,
+    required String type,
+    required String targetId,
+    String? coachId,
+    String? coachName,
+    String? packageDetails,
+    required double amount,
+    required String method,
+    String? screenshotUrl,
+  }) async {
+    await _firestore.collection('Pending_Payments').add({
+      'pers_ID': persId,
+      'user_email': userEmail,
+      'member_name': memberName,
+      'type': type,
+      'target_id': targetId,
+      'coach_id': coachId,
+      'coach_name': coachName,
+      'package': packageDetails,
+      'amount': amount,
+      'payment_method': method,
+      'screenshot_url': screenshotUrl,
+      'status': 'pending',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
   }
 }

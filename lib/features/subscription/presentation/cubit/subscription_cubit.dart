@@ -63,6 +63,35 @@ class SubscriptionCubit extends Cubit<SubscriptionState> {
     }
   }
 
+  Future<void> requestPayment({
+    required int persId,
+    required String email,
+    required String memberName,
+    required String planId,
+    required String planName,
+    required double amount,
+    required String method,
+    String? screenshotUrl,
+  }) async {
+    emit(SubscriptionLoading());
+    try {
+      final SubscriptionRemoteDataSource remote = (getMembershipPlansUseCase.repository as SubscriptionRepositoryImpl).remoteDataSource;
+      await remote.requestSubscriptionPayment(
+        persId: persId,
+        userEmail: email,
+        memberName: memberName,
+        planId: planId,
+        planName: planName,
+        amount: amount,
+        method: method,
+        screenshotUrl: screenshotUrl,
+      );
+      emit(SubscriptionSuccess());
+    } catch (e) {
+      emit(SubscriptionError(e.toString()));
+    }
+  }
+
   void reset() {
     emit(SubscriptionInitial());
   }

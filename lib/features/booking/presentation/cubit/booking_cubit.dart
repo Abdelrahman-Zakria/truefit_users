@@ -28,12 +28,14 @@ class BookingCubit extends Cubit<BookingState> {
 
   StreamSubscription? _bookingsSub;
   StreamSubscription? _walletSub;
+  StreamSubscription? _pendingSub;
 
   List<CoachEntity> _coaches = [];
   List<GroupClassEntity> _classes = [];
   List<PTOfferEntity> _offers = [];
   List<PTWalletEntity> _wallets = [];
   List<Map<String, dynamic>> _userBookings = [];
+  List<Map<String, dynamic>> _pendingPayments = [];
 
   BookingCubit({
     required this.getCoachesUseCase,
@@ -65,6 +67,14 @@ class BookingCubit extends Cubit<BookingState> {
         _wallets = wallets;
         _emitLoaded();
       });
+
+      await _pendingSub?.cancel();
+      final repository = buyPTPackageUseCase.repository;
+      final dynamic remote = (repository as dynamic).remoteDataSource;
+      _pendingSub = (remote.watchPendingPayments(persId) as Stream<List<Map<String, dynamic>>>).listen((pending) {
+        _pendingPayments = pending;
+        _emitLoaded();
+      });
     } catch (e) {
       emit(BookingError(e.toString()));
     }
@@ -77,6 +87,7 @@ class BookingCubit extends Cubit<BookingState> {
       ptOffers: _offers,
       userWallets: _wallets,
       userBookings: _userBookings,
+      pendingPayments: _pendingPayments,
     ));
   }
 
@@ -108,10 +119,48 @@ class BookingCubit extends Cubit<BookingState> {
     }
   }
 
+  Future<void> requestPayment({
+    required int persId,
+    required String email,
+    required String memberName,
+    required String type,
+    required String targetId,
+    String? coachId,
+    String? coachName,
+    String? packageDetails,
+    required double amount,
+    required String method,
+    String? screenshotUrl,
+  }) async {
+    emit(BookingLoading());
+    try {
+      final repository = buyPTPackageUseCase.repository;
+      final dynamic remote = (repository as dynamic).remoteDataSource;
+      await remote.requestBookingPayment(
+        persId: persId,
+        userEmail: email,
+        memberName: memberName,
+        type: type,
+        targetId: targetId,
+        coachId: coachId,
+        coachName: coachName,
+        packageDetails: packageDetails,
+        amount: amount,
+        method: method,
+        screenshotUrl: screenshotUrl,
+      );
+      emit(BookingSuccess()); 
+      _emitLoaded();
+    } catch (e) {
+      emit(BookingError(e.toString()));
+    }
+  }
+
   @override
   Future<void> close() {
     _bookingsSub?.cancel();
     _walletSub?.cancel();
+    _pendingSub?.cancel();
     return super.close();
   }
 
@@ -119,10 +168,12 @@ class BookingCubit extends Cubit<BookingState> {
     emit(BookingInitial());
     _bookingsSub?.cancel();
     _walletSub?.cancel();
+    _pendingSub?.cancel();
     _coaches = [];
     _classes = [];
     _offers = [];
     _wallets = [];
     _userBookings = [];
+    _pendingPayments = [];
   }
 }

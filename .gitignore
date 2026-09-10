@@ -57,3 +57,8 @@ android/app/google-services.json
 *.mdf
 *.ldf
 *.sqlitedb
+
+# Android Signing Secrets
+android/app/*.jks
+android/app/*.keystore
+android/key.properties
