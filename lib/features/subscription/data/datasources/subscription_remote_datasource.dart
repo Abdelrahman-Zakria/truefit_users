@@ -1,10 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/membership_plan_model.dart';
 import '../models/user_subscription_model.dart';
+import '../models/branch_model.dart';
 import '../../domain/entities/membership_plan_entity.dart';
+import '../../domain/entities/branch_entity.dart';
 
 abstract class SubscriptionRemoteDataSource {
   Future<List<MembershipPlanEntity>> getMembershipPlans();
+  Future<List<BranchEntity>> getBranches();
   Future<UserSubscriptionModel?> getUserActiveSubscription(int persId);
   Future<MembershipPlanEntity?> getPlanById(int planId);
   Future<void> subscribe(String planId);
@@ -17,6 +20,8 @@ abstract class SubscriptionRemoteDataSource {
     required double amount,
     required String method,
     String? screenshotUrl,
+    String? branchId,
+    String? branchName,
   });
 }
 
@@ -33,9 +38,52 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
   }
 
   @override
+  Future<List<BranchEntity>> getBranches() async {
+    try {
+      final querySnapshot = await _firestore.collection('branches').get();
+      if (querySnapshot.docs.isEmpty) {
+        return const [
+          BranchEntity(
+            id: 'main_branch',
+            name: 'Main Branch',
+            displayName: 'True Fit Main Branch',
+            address: 'Cairo, Egypt',
+            isActive: true,
+          ),
+        ];
+      }
+      final branches = querySnapshot.docs
+          .map((doc) => BranchModel.fromJson(doc.data(), doc.id))
+          .where((b) => b.isActive)
+          .toList();
+
+      if (branches.isEmpty) {
+        return const [
+          BranchEntity(
+            id: 'main_branch',
+            name: 'Main Branch',
+            displayName: 'True Fit Main Branch',
+            address: 'Cairo, Egypt',
+            isActive: true,
+          ),
+        ];
+      }
+      return branches;
+    } catch (_) {
+      return const [
+        BranchEntity(
+          id: 'main_branch',
+          name: 'Main Branch',
+          displayName: 'True Fit Main Branch',
+          address: 'Cairo, Egypt',
+          isActive: true,
+        ),
+      ];
+    }
+  }
+
+  @override
   Future<UserSubscriptionModel?> getUserActiveSubscription(int persId) async {
-    // We fetch all subscriptions for this user and sort in-memory 
-    // to avoid requiring a composite index in Firestore.
     final querySnapshot = await _firestore
         .collection('Gym_Subscription_pers')
         .where('pers_ID', isEqualTo: persId)
@@ -49,7 +97,6 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
         .map((doc) => UserSubscriptionModel.fromJson(doc.data()))
         .toList();
 
-    // Sort by toDate descending
     subscriptions.sort((a, b) => b.toDate.compareTo(a.toDate));
 
     return subscriptions.first;
@@ -85,6 +132,8 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
     required double amount,
     required String method,
     String? screenshotUrl,
+    String? branchId,
+    String? branchName,
   }) async {
     await _firestore.collection('Pending_Payments').add({
       'pers_ID': persId,
@@ -96,6 +145,8 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
       'amount': amount,
       'payment_method': method,
       'screenshot_url': screenshotUrl,
+      'branch_id': branchId,
+      'branch_name': branchName,
       'status': 'pending',
       'timestamp': FieldValue.serverTimestamp(),
     });

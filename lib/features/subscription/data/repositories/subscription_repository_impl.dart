@@ -1,4 +1,5 @@
 import '../../domain/entities/membership_plan_entity.dart';
+import '../../domain/entities/branch_entity.dart';
 import '../../domain/repositories/subscription_repository.dart';
 import '../datasources/subscription_remote_datasource.dart';
 
@@ -10,6 +11,11 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
   @override
   Future<List<MembershipPlanEntity>> getMembershipPlans() {
     return remoteDataSource.getMembershipPlans();
+  }
+
+  @override
+  Future<List<BranchEntity>> getBranches() {
+    return remoteDataSource.getBranches();
   }
 
   @override

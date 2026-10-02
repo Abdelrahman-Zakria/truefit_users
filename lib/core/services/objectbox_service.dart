@@ -1,6 +1,6 @@
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import '../../objectbox.g.dart'; // This will be generated
+import '../../objectbox.g.dart';
 import '../../features/auth/data/models/user_box_entity.dart';
 import '../../features/notifications/data/models/notification_box_entity.dart';
 
@@ -34,9 +34,22 @@ class ObjectBoxService {
     userBox.removeAll();
   }
 
+  void clearAll() {
+    userBox.removeAll();
+    notificationBox.removeAll();
+  }
+
   // Notifications
   void saveNotification(NotificationBoxEntity notification) {
-    notificationBox.put(notification);
+    final existing = notificationBox.getAll();
+    final isDuplicate = existing.any((n) =>
+        n.titleEn == notification.titleEn &&
+        n.bodyEn == notification.bodyEn &&
+        n.timestamp.difference(notification.timestamp).inSeconds.abs() < 5);
+
+    if (!isDuplicate) {
+      notificationBox.put(notification);
+    }
   }
 
   List<NotificationBoxEntity> getNotifications() {

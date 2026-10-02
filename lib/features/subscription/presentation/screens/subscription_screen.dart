@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/intl/translations.dart';
+import '../../../../core/utils/guest_utils.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
 import '../cubit/subscription_cubit.dart';
@@ -31,9 +32,7 @@ class SubscriptionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<SubscriptionCubit, SubscriptionState>(
       builder: (context, state) {
-        print('DEBUG: SubscriptionScreen state: $state');
         if (state is SubscriptionInitial) {
-          // Trigger load if somehow skipped
           final authState = context.read<AuthCubit>().state;
           if (authState is Authenticated) {
             context.read<SubscriptionCubit>().loadMembershipPlans(persId: authState.user.persId);
@@ -48,11 +47,10 @@ class SubscriptionScreen extends StatelessWidget {
         }
 
         if (state is SubscriptionPlansLoaded) {
-          print('DEBUG: Plans loaded: ${state.plans.length}');
           if (state.plans.isEmpty) {
             return Scaffold(
               backgroundColor: AppTheme.backgroundBlack,
-              body: Center(child: Text(tr('noPlansFound') ?? "No plans found in Firestore", style: const TextStyle(color: Colors.white))),
+              body: Center(child: Text(tr('noPlansFound'), style: const TextStyle(color: Colors.white))),
             );
           }
           return Scaffold(
@@ -240,7 +238,7 @@ class SubscriptionScreen extends StatelessWidget {
                   if (plan.originalPrice != null)
                     Text(
                       '${plan.originalPrice} LE',
-                      style: const TextStyle(color: Colors.grey, fontSize: 12, decoration: TextDecoration.lineThrough),
+                      style: const TextStyle(color: Colors.grey, fontSize: 10, decoration: TextDecoration.lineThrough),
                     ),
                   RichText(
                     text: TextSpan(
@@ -269,7 +267,13 @@ class SubscriptionScreen extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () => _showRenewalModal(context, allPlans, initialPlan: plan),
+              onPressed: () {
+                if (isGuest) {
+                  openGuestRegistration(context, planId: plan.id);
+                } else {
+                  _showRenewalModal(context, allPlans, initialPlan: plan);
+                }
+              },
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: plan.isPopular ? AppTheme.primaryRed : const Color(0xFF3A3A3A)),
                 padding: const EdgeInsets.symmetric(vertical: 14),

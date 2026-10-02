@@ -210,6 +210,7 @@ class InjectionContainer {
   }
 
   static void clearAllData() {
+    _objectBoxService?.clearAll();
     _authCubit?.reset();
     _profileCubit?.reset();
     _notificationsCubit?.reset();

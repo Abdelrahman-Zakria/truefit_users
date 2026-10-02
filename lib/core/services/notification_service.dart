@@ -25,7 +25,7 @@ class NotificationService {
     tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
     
     // Local Notifications Setup
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -44,6 +44,26 @@ class NotificationService {
       },
     );
 
+    // Register Notification Channel for Android
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'high_importance_channel',
+      'High Importance Notifications',
+      description: 'This channel is used for important notifications.',
+      importance: Importance.max,
+    );
+
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(channel);
+    }
+
+    // Set FCM Foreground Options
+    await _fcm.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
     // Request Permissions
     await _requestPermissions();
 
@@ -53,8 +73,7 @@ class NotificationService {
     // FCM Foreground Handling
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       RemoteNotification? notification = message.notification;
-      AndroidNotification? android = message.notification?.android;
-      if (notification != null && android != null && !kIsWeb) {
+      if (notification != null && !kIsWeb) {
         _handleIncomingNotification(
           notification.title,
           notification.body,
@@ -65,13 +84,37 @@ class NotificationService {
 
     // FCM Background/Terminated Opening Handling
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      _saveRemoteMessageToLocal(message);
       _navigateToNotifications();
     });
 
     // Check for initial message (when app is opened from terminated state via notification)
     RemoteMessage? initialMessage = await _fcm.getInitialMessage();
     if (initialMessage != null) {
+      _saveRemoteMessageToLocal(initialMessage);
       _navigateToNotifications();
+    }
+  }
+
+  void _saveRemoteMessageToLocal(RemoteMessage message) {
+    RemoteNotification? notification = message.notification;
+    final title = notification?.title ?? message.data['title'] ?? message.data['titleEn'] ?? message.data['titleAr'];
+    final body = notification?.body ?? message.data['body'] ?? message.data['bodyEn'] ?? message.data['bodyAr'];
+    final type = message.data['type'] ?? 'system';
+
+    if (title != null || body != null) {
+      InjectionContainer.objectBoxService.saveNotification(NotificationBoxEntity(
+        titleEn: title ?? '',
+        titleAr: title ?? '',
+        bodyEn: body ?? '',
+        bodyAr: body ?? '',
+        type: type,
+        timestamp: message.sentTime ?? DateTime.now(),
+      ));
+
+      try {
+        InjectionContainer.notificationsCubit.loadNotifications();
+      } catch (_) {}
     }
   }
 
@@ -117,7 +160,7 @@ class NotificationService {
           'High Importance Notifications',
           importance: Importance.max,
           priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
+          icon: '@mipmap/launcher_icon',
         ),
         iOS: DarwinNotificationDetails(),
       ),

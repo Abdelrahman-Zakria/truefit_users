@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/membership_plan_entity.dart';
+import '../../domain/entities/branch_entity.dart';
 import '../../data/models/user_subscription_model.dart';
 
 abstract class SubscriptionState extends Equatable {
@@ -15,13 +16,19 @@ class SubscriptionLoading extends SubscriptionState {}
 
 class SubscriptionPlansLoaded extends SubscriptionState {
   final List<MembershipPlanEntity> plans;
+  final List<BranchEntity> branches;
   final MembershipPlanEntity? activePlan;
   final UserSubscriptionModel? userSubscription;
 
-  const SubscriptionPlansLoaded(this.plans, {this.activePlan, this.userSubscription});
+  const SubscriptionPlansLoaded(
+    this.plans, {
+    this.branches = const [],
+    this.activePlan,
+    this.userSubscription,
+  });
 
   @override
-  List<Object?> get props => [plans, activePlan, userSubscription];
+  List<Object?> get props => [plans, branches, activePlan, userSubscription];
 }
 
 class SubscriptionError extends SubscriptionState {

@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../../domain/entities/membership_plan_entity.dart';
+import '../../domain/entities/branch_entity.dart';
 import '../../data/models/user_subscription_model.dart';
 import '../../data/datasources/subscription_remote_datasource.dart';
 import '../../data/repositories/subscription_repository_impl.dart';
@@ -22,18 +23,15 @@ class SubscriptionCubit extends Cubit<SubscriptionState> {
     emit(SubscriptionLoading());
     try {
       final plans = await getMembershipPlansUseCase(NoParams());
-      print('DEBUG: Plans fetched from usecase: ${plans.length}');
+      final SubscriptionRemoteDataSource remote = (getMembershipPlansUseCase.repository as SubscriptionRepositoryImpl).remoteDataSource;
+      final branches = await remote.getBranches();
       
       MembershipPlanEntity? activePlan;
       UserSubscriptionModel? userSub;
 
-      if (persId != null) {
-        print('DEBUG: Fetching active sub for $persId');
-        // This logic should ideally be in a use case, but for speed wiring:
-        final SubscriptionRemoteDataSource remote = (getMembershipPlansUseCase.repository as SubscriptionRepositoryImpl).remoteDataSource;
+      if (persId != null && persId != 0) {
         userSub = await remote.getUserActiveSubscription(persId);
         if (userSub != null) {
-          print('DEBUG: Found sub: ${userSub.planId}');
           final planModel = await remote.getPlanById(userSub.planId);
           if (planModel != null) {
             activePlan = planModel;
@@ -41,14 +39,29 @@ class SubscriptionCubit extends Cubit<SubscriptionState> {
         }
       }
 
-      print('DEBUG: Emitting SubscriptionPlansLoaded');
-      // Force a slight delay to ensure UI is ready to receive state
       await Future.delayed(const Duration(milliseconds: 100));
-      emit(SubscriptionPlansLoaded(plans, activePlan: activePlan, userSubscription: userSub));
+      emit(SubscriptionPlansLoaded(plans, branches: branches, activePlan: activePlan, userSubscription: userSub));
     } catch (e, stack) {
       print('DEBUG: Error in loadMembershipPlans: $e');
       print('DEBUG: Stacktrace: $stack');
       emit(SubscriptionError(e.toString()));
+    }
+  }
+
+  Future<List<BranchEntity>> getBranches() async {
+    try {
+      final SubscriptionRemoteDataSource remote = (getMembershipPlansUseCase.repository as SubscriptionRepositoryImpl).remoteDataSource;
+      return await remote.getBranches();
+    } catch (_) {
+      return const [
+        BranchEntity(
+          id: 'main_branch',
+          name: 'Main Branch',
+          displayName: 'True Fit Main Branch',
+          address: 'Cairo, Egypt',
+          isActive: true,
+        ),
+      ];
     }
   }
 
@@ -57,7 +70,7 @@ class SubscriptionCubit extends Cubit<SubscriptionState> {
     try {
       await subscribeUseCase(planId);
       emit(SubscriptionSuccess());
-      loadMembershipPlans(); // Reload
+      loadMembershipPlans();
     } catch (e) {
       emit(SubscriptionError(e.toString()));
     }
@@ -72,6 +85,8 @@ class SubscriptionCubit extends Cubit<SubscriptionState> {
     required double amount,
     required String method,
     String? screenshotUrl,
+    String? branchId,
+    String? branchName,
   }) async {
     emit(SubscriptionLoading());
     try {
@@ -85,6 +100,8 @@ class SubscriptionCubit extends Cubit<SubscriptionState> {
         amount: amount,
         method: method,
         screenshotUrl: screenshotUrl,
+        branchId: branchId,
+        branchName: branchName,
       );
       emit(SubscriptionSuccess());
     } catch (e) {

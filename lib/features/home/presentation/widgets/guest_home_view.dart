@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/intl/translations.dart';
+import '../../../../core/utils/guest_utils.dart';
 import '../../domain/entities/promotion_entity.dart';
 import '../../domain/entities/outdoor_session_entity.dart';
 import '../../domain/entities/home_offer_entity.dart';
@@ -38,7 +39,7 @@ class GuestHomeView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHero(),
+        _buildHero(context),
         const SizedBox(height: 24),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Text(lang == 'ar' ? "العروض والإعلانات" : "Promotions & Ads", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
         const SizedBox(height: 16),
@@ -53,7 +54,7 @@ class GuestHomeView extends StatelessWidget {
     );
   }
 
-  Widget _buildHero() {
+  Widget _buildHero(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
@@ -162,7 +163,17 @@ class GuestHomeView extends StatelessWidget {
           itemBuilder: (context, index) {
             final p = packages[index];
             return GestureDetector(
-              onTap: () => _showModal(context, PackageDetailModal(package: p, lang: lang, onSubscribe: onJoinNow)),
+              onTap: () => _showModal(
+                context,
+                PackageDetailModal(
+                  package: p,
+                  lang: lang,
+                  onSubscribe: () {
+                    Navigator.pop(context);
+                    openGuestRegistration(context, planId: p.id);
+                  },
+                ),
+              ),
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(20), border: Border.all(color: p.popular ? AppTheme.primaryRed.withValues(alpha: 0.3) : const Color(0xFF2A2A2A))),
@@ -205,7 +216,7 @@ class GuestHomeView extends StatelessWidget {
             final s = outdoorSessions[index];
             final isFull = s.spots == 0;
             return GestureDetector(
-              onTap: () => _showModal(context, OutdoorSessionDetailModal(session: s, lang: lang, onBook: onJoinNow)),
+              onTap: () => _showModal(context, OutdoorSessionDetailModal(session: s, lang: lang, onBook: () => openGuestRegistration(context))),
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFF2A2A2A))),

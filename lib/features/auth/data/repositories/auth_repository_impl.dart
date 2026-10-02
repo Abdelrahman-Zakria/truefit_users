@@ -25,7 +25,7 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> logout() async {
     await remoteDataSource.logout();
-    InjectionContainer.objectBoxService.clearUser();
+    InjectionContainer.objectBoxService.clearAll();
   }
 
   @override
