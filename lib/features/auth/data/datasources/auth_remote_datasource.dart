@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/di/injection_container.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -12,7 +12,6 @@ abstract class AuthRemoteDataSource {
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
 
   @override
   Future<UserModel> login(String phoneNumber, String password) async {
@@ -53,9 +52,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     final user = UserModel.fromJson(userData);
 
-    // 3. Update FCM token in Gym_pers on login
+    // 3. Update FCM token in Gym_pers on login safely
     try {
-      final fcmToken = await _fcm.getToken();
+      final fcmToken = await InjectionContainer.notificationService.getFCMToken();
       if (fcmToken != null) {
         await docRef.update({
           'fcm_token': fcmToken,
@@ -121,10 +120,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
     }
 
-    // Get current FCM token
+    // Get current FCM token safely
     String? fcmToken;
     try {
-      fcmToken = await _fcm.getToken();
+      fcmToken = await InjectionContainer.notificationService.getFCMToken();
     } catch (e) {
       print('Failed to get FCM token during registration: $e');
     }

@@ -67,8 +67,21 @@ class NotificationService {
     // Request Permissions
     await _requestPermissions();
 
-    // Subscribe to global topic
-    await _fcm.subscribeToTopic('all_users');
+    // Subscribe to global topic safely
+    try {
+      if (Platform.isIOS) {
+        final apnsToken = await _fcm.getAPNSToken();
+        if (apnsToken != null) {
+          await _fcm.subscribeToTopic('all_users');
+        } else {
+          debugPrint("APNs token not ready during init; skipping initial topic subscription.");
+        }
+      } else {
+        await _fcm.subscribeToTopic('all_users');
+      }
+    } catch (e) {
+      debugPrint("Error subscribing to FCM topic during init: $e");
+    }
 
     // FCM Foreground Handling
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -220,6 +233,18 @@ class NotificationService {
   }
 
   Future<String?> getFCMToken() async {
-    return await _fcm.getToken();
+    try {
+      if (Platform.isIOS) {
+        final apnsToken = await _fcm.getAPNSToken();
+        if (apnsToken == null) {
+          debugPrint("APNs token not available yet on iOS.");
+          return null;
+        }
+      }
+      return await _fcm.getToken();
+    } catch (e) {
+      debugPrint("Error getting FCM token: $e");
+      return null;
+    }
   }
 }
