@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/di/injection_container.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -26,7 +26,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception('User not found');
     }
 
-    final docRef = querySnapshot.docs.first.reference;
     final userData = querySnapshot.docs.first.data();
     final dateBirth = userData['DATE_BIRTH'] as String?;
 
@@ -51,24 +50,24 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
 
     final user = UserModel.fromJson(userData);
+    final int persId = user.persId ?? (userData['pers_ID'] is int ? userData['pers_ID'] : int.tryParse(userData['pers_ID']?.toString() ?? '0') ?? 0);
 
-    // 3. Update FCM token in Gym_pers on login safely
+    // 3. Subscribe to Members Topic & Save Member FCM Token on Login
     try {
-      final fcmToken = await InjectionContainer.notificationService.getFCMToken();
-      if (fcmToken != null) {
-        await docRef.update({
-          'fcm_token': fcmToken,
-          'fcmToken': fcmToken,
-        });
+      await FirebaseMessaging.instance.subscribeToTopic('all_users');
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && persId != 0) {
+        await _firestore
+            .collection('Gym_pers')
+            .doc(persId.toString())
+            .set({'fcm_token': token, 'fcmToken': token}, SetOptions(merge: true));
       }
     } catch (e) {
-      print('Failed to update FCM token on login: $e');
+      print('Failed to subscribe topic / save FCM token on login: $e');
     }
 
     // 4. Check if member subscription is still pending receptionist approval
-    final int persId = user.persId ?? 0;
     if (persId != 0) {
-      // Check if user has an active subscription in Gym_Subscription_pers
       final activeSub = await _firestore
           .collection('Gym_Subscription_pers')
           .where('pers_ID', isEqualTo: persId)
@@ -77,7 +76,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           .get();
 
       if (activeSub.docs.isEmpty) {
-        // Check if there is a pending payment in Pending_Payments
         final pendingPayment = await _firestore
             .collection('Pending_Payments')
             .where('pers_ID', isEqualTo: persId)
@@ -108,7 +106,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw Exception('Phone number is required');
     }
 
-    // Standardize birthday format for password verification
     if (birthday.isEmpty) {
       birthday = '2000-01-01';
     } else {
@@ -120,15 +117,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
     }
 
-    // Get current FCM token safely
-    String? fcmToken;
+    // Get FCM token & subscribe to topic
+    String? token;
     try {
-      fcmToken = await InjectionContainer.notificationService.getFCMToken();
+      await FirebaseMessaging.instance.subscribeToTopic('all_users');
+      token = await FirebaseMessaging.instance.getToken();
     } catch (e) {
-      print('Failed to get FCM token during registration: $e');
+      print('Error getting FCM token / subscribing during registration: $e');
     }
 
-    // Check if phone number already registered
     final existingUserQuery = await _firestore
         .collection('Gym_pers')
         .where('Tel_Mobile1', isEqualTo: phone)
@@ -137,7 +134,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     int persId;
     if (existingUserQuery.docs.isNotEmpty) {
-      final docRef = existingUserQuery.docs.first.reference;
       final existingDoc = existingUserQuery.docs.first.data();
       final idRaw = existingDoc['pers_ID'];
       if (idRaw is int) {
@@ -146,12 +142,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         persId = int.tryParse(idRaw.toString()) ?? (DateTime.now().millisecondsSinceEpoch % 100000000);
       }
 
-      if (fcmToken != null) {
-        await docRef.update({
-          'fcm_token': fcmToken,
-          'fcmToken': fcmToken,
-        });
+      final updateData = <String, dynamic>{'status': 'pending'};
+      if (token != null) {
+        updateData['fcm_token'] = token;
+        updateData['fcmToken'] = token;
       }
+      await _firestore.collection('Gym_pers').doc(persId.toString()).set(updateData, SetOptions(merge: true));
     } else {
       persId = DateTime.now().millisecondsSinceEpoch % 100000000;
 
@@ -166,15 +162,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'branch_id': branchId,
         'branch_name': branchName,
         'status': 'pending',
-        'fcm_token': fcmToken,
-        'fcmToken': fcmToken,
+        'fcm_token': token,
+        'fcmToken': token,
         'LogTime': DateTime.now().toIso8601String(),
       };
 
-      await _firestore.collection('Gym_pers').doc(persId.toString()).set(gymPersData);
+      await _firestore.collection('Gym_pers').doc(persId.toString()).set(gymPersData, SetOptions(merge: true));
     }
 
-    // Create Pending Subscription Payment request for receptionist approval
     final planId = data['planId'] ?? data['target_id'];
     final planName = data['planName'] ?? data['package'] ?? 'Membership';
     final amount = (data['amount'] is num) ? (data['amount'] as num).toDouble() : double.tryParse(data['amount']?.toString() ?? '0') ?? 0.0;
@@ -199,12 +194,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<void> logout() async {
-    // Clear session if needed
-  }
+  Future<void> logout() async {}
 
   @override
-  Future<void> continueAsGuest() async {
-    // Guest session
-  }
+  Future<void> continueAsGuest() async {}
 }

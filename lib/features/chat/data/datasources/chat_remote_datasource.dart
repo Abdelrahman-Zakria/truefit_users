@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:rxdart/rxdart.dart';
+import '../../../../core/services/fcm_v1_service.dart';
 import '../models/conversation_model.dart';
 import '../models/message_model.dart';
 
@@ -14,7 +15,6 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
 
   @override
   Stream<List<ConversationModel>> watchConversations(int persId) {
-    // 1. Existing conversations where the user is a participant
     final convStream = _firestore
         .collection('Gym_Conversations')
         .where('participants', arrayContains: persId)
@@ -23,7 +23,6 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
             .map((doc) => ConversationModel.fromJson({...doc.data(), 'id': doc.id}))
             .toList());
 
-    // 2. PT Wallets to find coaches the user has active subscriptions with
     final walletStream = _firestore
         .collection('User_PT_Wallet')
         .where('pers_ID', isEqualTo: persId)
@@ -33,7 +32,6 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
             .map((doc) => doc.data()['coach_id'] as String)
             .toSet());
 
-    // 3. Coaches info stream
     final coachesStream = _firestore.collection('Gym_Coaches').snapshots().map((snapshot) => snapshot.docs);
 
     return Rx.combineLatest3<List<ConversationModel>, Set<String>, List<QueryDocumentSnapshot<Map<String, dynamic>>>, List<ConversationModel>>(
@@ -44,16 +42,12 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
         final List<ConversationModel> result = List.from(existingConvs);
         
         for (final coachId in subscribedCoachIds) {
-          // Check if a conversation already exists with this coach
-          // Assuming participants array [persId, coachId]
           final hasConv = existingConvs.any((c) => c.id == '${persId}_$coachId' || c.id == '${coachId}_$persId');
 
           if (!hasConv) {
-            // Find coach details
             final coachDoc = coachesDocs.firstWhere((doc) => doc.id == coachId);
             final coachData = coachDoc.data();
             
-            // Localized specialty
             String role = "Coach";
             if (coachData['specialty'] is Map) {
               role = coachData['specialty']['en'] ?? "Coach";
@@ -100,13 +94,11 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     final convRef = _firestore.collection('Gym_Conversations').doc(conversationId);
     final convDoc = await convRef.get();
 
+    String coachId = '';
+
     if (!convDoc.exists) {
-      // Create conversation document if it's the first message (for synthetic conversations)
-      // Extract coachId from conversationId (format: persId_coachId)
       final parts = conversationId.split('_');
-      String coachId = parts.length > 1 ? parts[1] : '';
-      
-      // If the ID is coachId_persId, parts[0] might be coachId
+      coachId = parts.length > 1 ? parts[1] : '';
       if (coachId == persId.toString()) coachId = parts[0];
 
       await convRef.set({
@@ -117,6 +109,18 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
         'coach_id': coachId,
       });
     } else {
+      final data = convDoc.data();
+      coachId = data?['coach_id']?.toString() ?? '';
+      if (coachId.isEmpty) {
+        final List participants = data?['participants'] ?? [];
+        for (var p in participants) {
+          if (p.toString() != persId.toString()) {
+            coachId = p.toString();
+            break;
+          }
+        }
+      }
+
       await convRef.update({
         'last_message': text,
         'updated_at': FieldValue.serverTimestamp(),
@@ -124,5 +128,76 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     }
 
     await convRef.collection('Messages').add(msgData);
+
+    // Send direct Push Notification to the target Coach
+    if (coachId.isNotEmpty) {
+      _sendPushToCoach(
+        coachId: coachId,
+        senderName: senderName,
+        text: text,
+        conversationId: conversationId,
+        persId: persId,
+      );
+    }
+  }
+
+  Future<void> _sendPushToCoach({
+    required String coachId,
+    required String senderName,
+    required String text,
+    required String conversationId,
+    required int persId,
+  }) async {
+    try {
+      DocumentSnapshot<Map<String, dynamic>> coachDoc =
+          await _firestore.collection('Gym_Coaches').doc(coachId).get();
+
+      if (!coachDoc.exists) {
+        final q = await _firestore
+            .collection('Gym_Coaches')
+            .where('uid', isEqualTo: coachId)
+            .limit(1)
+            .get();
+        if (q.docs.isNotEmpty) {
+          coachDoc = q.docs.first;
+        }
+      }
+
+      if (coachDoc.exists) {
+        final coachData = coachDoc.data();
+        final fcmToken = coachData?['fcmToken'] ?? coachData?['fcm_token'];
+
+        // Write notification document to Coach_Notifications collection
+        await _firestore.collection('Coach_Notifications').add({
+          'coach_id': coachId,
+          'coach_uid': coachData?['uid'] ?? coachId,
+          'title': senderName,
+          'body': text,
+          'type': 'chat',
+          'conversation_id': conversationId,
+          'sender_id': persId,
+          'sender_name': senderName,
+          'fcm_token': fcmToken,
+          'created_at': FieldValue.serverTimestamp(),
+        });
+
+        // Send direct FCM HTTP v1 notification if token exists
+        if (fcmToken != null && fcmToken.toString().isNotEmpty) {
+          await FcmV1Service.sendNotification(
+            targetToken: fcmToken.toString(),
+            title: senderName,
+            body: text,
+            data: {
+              'type': 'chat',
+              'conversation_id': conversationId,
+              'sender_id': persId.toString(),
+              'sender_name': senderName,
+            },
+          );
+        }
+      }
+    } catch (e) {
+      print('Failed to send push notification to coach $coachId: $e');
+    }
   }
 }

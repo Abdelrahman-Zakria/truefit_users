@@ -16,24 +16,34 @@ class BarcodeView extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Real 1D Barcode for Member ID
+          // QR Code encoding the raw numeric pers_ID (e.g. "50392")
           BarcodeWidget(
-            barcode: Barcode.code128(), // Code 128 is versatile and scannable
+            barcode: Barcode.qrCode(),
+            data: memberId,
+            width: 140,
+            height: 140,
+            drawText: false,
+            color: Colors.black,
+          ),
+          const SizedBox(height: 16),
+          // Barcode encoding the raw numeric pers_ID
+          BarcodeWidget(
+            barcode: Barcode.code128(),
             data: memberId,
             width: double.infinity,
-            height: 80,
+            height: 50,
             drawText: false,
             color: Colors.black,
           ),
           const SizedBox(height: 12),
           Text(
-            'TF-2024-$memberId',
+            memberId,
             style: const TextStyle(
               color: Colors.black,
-              fontSize: 12,
+              fontSize: 16,
               fontFamily: 'monospace',
               fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
+              letterSpacing: 2.0,
             ),
           ),
         ],

@@ -51,6 +51,8 @@ google-services.json
 GoogleService-Info.plist
 ios/Runner/GoogleService-Info.plist
 android/app/google-services.json
+true-fit-*.json
+*.json
 *.p8
 
 # Large Database / Binary files
