@@ -131,73 +131,30 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
 
     // Send direct Push Notification to the target Coach
     if (coachId.isNotEmpty) {
-      _sendPushToCoach(
-        coachId: coachId,
-        senderName: senderName,
-        text: text,
-        conversationId: conversationId,
-        persId: persId,
-      );
-    }
-  }
-
-  Future<void> _sendPushToCoach({
-    required String coachId,
-    required String senderName,
-    required String text,
-    required String conversationId,
-    required int persId,
-  }) async {
-    try {
-      DocumentSnapshot<Map<String, dynamic>> coachDoc =
-          await _firestore.collection('Gym_Coaches').doc(coachId).get();
-
-      if (!coachDoc.exists) {
-        final q = await _firestore
-            .collection('Gym_Coaches')
-            .where('uid', isEqualTo: coachId)
-            .limit(1)
-            .get();
-        if (q.docs.isNotEmpty) {
-          coachDoc = q.docs.first;
-        }
-      }
-
-      if (coachDoc.exists) {
-        final coachData = coachDoc.data();
-        final fcmToken = coachData?['fcmToken'] ?? coachData?['fcm_token'];
-
-        // Write notification document to Coach_Notifications collection
+      try {
         await _firestore.collection('Coach_Notifications').add({
           'coach_id': coachId,
-          'coach_uid': coachData?['uid'] ?? coachId,
           'title': senderName,
           'body': text,
           'type': 'chat',
           'conversation_id': conversationId,
           'sender_id': persId,
           'sender_name': senderName,
-          'fcm_token': fcmToken,
           'created_at': FieldValue.serverTimestamp(),
         });
+      } catch (_) {}
 
-        // Send direct FCM HTTP v1 notification if token exists
-        if (fcmToken != null && fcmToken.toString().isNotEmpty) {
-          await FcmV1Service.sendNotification(
-            targetToken: fcmToken.toString(),
-            title: senderName,
-            body: text,
-            data: {
-              'type': 'chat',
-              'conversation_id': conversationId,
-              'sender_id': persId.toString(),
-              'sender_name': senderName,
-            },
-          );
-        }
-      }
-    } catch (e) {
-      print('Failed to send push notification to coach $coachId: $e');
+      FcmV1Service.sendNotificationToCoach(
+        coachId: coachId,
+        title: senderName,
+        body: text,
+        data: {
+          'type': 'chat',
+          'conversation_id': conversationId,
+          'sender_id': persId.toString(),
+          'sender_name': senderName,
+        },
+      );
     }
   }
 }
