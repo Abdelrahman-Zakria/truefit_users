@@ -57,24 +57,41 @@ class NotificationService {
       await androidPlugin.createNotificationChannel(channel);
     }
 
-    // Set FCM Foreground Options
-    await _fcm.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    // Set FCM Foreground Options for iOS
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      await _fcm.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    } else {
+      await _fcm.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
 
     // Request Permissions
     await _requestPermissions();
 
-    // Subscribe to global topic safely
+    // Subscribe to global topic safely with APNs retry for iOS
     try {
-      if (Platform.isIOS) {
-        final apnsToken = await _fcm.getAPNSToken();
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        String? apnsToken;
+        try {
+          apnsToken = await _fcm.getAPNSToken();
+        } catch (_) {}
+        int retries = 0;
+        while (apnsToken == null && retries < 5) {
+          await Future.delayed(const Duration(seconds: 1));
+          try {
+            apnsToken = await _fcm.getAPNSToken();
+          } catch (_) {}
+          retries++;
+        }
         if (apnsToken != null) {
           await _fcm.subscribeToTopic('all_users');
-        } else {
-          debugPrint("APNs token not ready during init; skipping initial topic subscription.");
         }
       } else {
         await _fcm.subscribeToTopic('all_users');
@@ -234,10 +251,21 @@ class NotificationService {
 
   Future<String?> getFCMToken() async {
     try {
-      if (Platform.isIOS) {
-        final apnsToken = await _fcm.getAPNSToken();
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        String? apnsToken;
+        try {
+          apnsToken = await _fcm.getAPNSToken();
+        } catch (_) {}
+        int retries = 0;
+        while (apnsToken == null && retries < 5) {
+          await Future.delayed(const Duration(seconds: 1));
+          try {
+            apnsToken = await _fcm.getAPNSToken();
+          } catch (_) {}
+          retries++;
+        }
         if (apnsToken == null) {
-          debugPrint("APNs token not available yet on iOS.");
+          debugPrint("APNs token not available on physical iOS device yet.");
           return null;
         }
       }
