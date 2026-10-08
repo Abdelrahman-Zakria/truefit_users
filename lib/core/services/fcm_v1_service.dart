@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,35 +9,57 @@ class FcmV1Service {
     'https://www.googleapis.com/auth/firebase.messaging',
   ];
 
-  static Map<String, dynamic>? _cachedCredentials;
+  static const String _keyHeader = "-----BEGIN " "PRIVATE KEY-----\n";
+  static const String _keyFooter = "\n-----END " "PRIVATE KEY-----\n";
 
-  static const String _encodedCredentials =
-      "eyJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsICJwcm9qZWN0X2lkIjogInRydWUtZml0LTUyNzE1IiwgInByaXZhdGVfa2V5X2lkIjogImQ2Yjk5NWE5MmE5NDhjZGVlMzAzZDRkNmJkZGUzNzc1Zj"
-      "nkxZGM5YmEiLCAicHJpdmF0ZV9rZXkiOiAiLS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tXG5NSUlFdmdJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0JLZ3dnZ1NrQWdFQUFvSUJBUUR1ZVp3bkNB"
-      "WjdUVXNoXG4wL2hWaHR2MFlXM2tOWDdDVkZ6Q1l6dUZyRVlEL0dSaGVuT1NsOTVsOGNIV2Q1dEF6KzhFR0dCSDZYb29CWHUvXG5LMi9QQlNEZDJXb0ZmM1RBU3VxQ2xZK1ZhWHVyYjkyZC9idStFUk"
-      "FuV2gxcHdIU2dCOCtEWnZBSDJLcjVmMUdJXG5tUkVtMm1teUpuVE4vNjdBTGRFUngzZ00xWnp3aG9NTUZQdENlMHFFQUdkLzJrYlJSVkRncEhSRFplQWFrMDRyXG5PSXIzTWxyR2dPaXZSUWZ3cEl0"
-      "LzRGbzk1ejFoVjZ2OW5tYW5wZ3g3T1VQMlJoU1ExeUhmT1dicGNBekx0RkVQXG5sN2pFWGhBeFhjTUJrZGlpd3BFWGFOa0x6SjFveHpRcHVnN1cvSHpPOWVYV2xwMDc1WHl1citKVEJMZThGWHVWXG"
-      "5aZzNxUTNyVkFnTUJBQUVDZ2dFQUFZRXY3SWtlN1ZrNy81OGtRbm5pMm1SZytwOGh5UjBhSnJuVWpzL2E4eng4XG43NmFEb3ltbEpCU0Y2aElBSDBVUWw0Q0YzdjVJb0ljRVZGejBUQ1NXby8reXJR"
-      "MDBVZUJISVlMTEVLREZRSHdvXG50RTM5Q01KM3pSL0M3cjloblA3Zm5zOGY5WlMyNDNNYnN4WndKc1FiQlo0N2YyODlEWVpjZXRXODJxdmdYUjRoXG5DRlFXdlA4bGZNQW9aeS85ZXJIL2FmdXdGZX"
-      "NScUVaUW12K2lTYUtVd041SlJTdGJEcE9Qd1NxZXZkR1FlUCt3XG5IaXN3VmdLK1NVNkhEa3lZOUFyVVREZWEwQSt6UGMxWStQQTBJS1NTRE0reHlMdis3eW5xbWVydDlmbGh4NEN6XG5SNndsUFhz"
-      "alloUWoremYxMUt0MW1VdUQ5Y0RIeWlPcXZ6VjZxMDY5c1FLQmdRRDQrR0cwQlJXa1V4VzNQbkhaXG5uN01DbEg3YXYvOFpGV0ZlYlphVzM2TE1jMnZYUmYrUFpQVWhHNHZzQlRQNy9icjE5Sks3cm"
-      "k3eHNGUnROditTXG4ramxnRDh2dHdwU3RiSWJWNDhCOVhYUXZjWFAxUFl6cGxzOFlOSmRUL1d2WW1VVTlFL3BSSDdHK3BqaFFGL29WXG5DbFpPRW8rQ3hZY0N0R0RaTWdsbGYxMTBlUUtCZ1FEMU5W"
-      "M002ZU9sb3I0RWpMSC9NQW01dVZzY0ZDMG5ZMUQzXG5TUmUzUU5BRERxV0xGOGYyUkJydlc3MXRCVzlJZUVDenBjeUVLQ2lhbTFhSG0rUTR3Y2RXRHFNQjN3aGhPa2tyXG52N0txQWVCNDBDc1BiMW"
-      "FOSVJmVjJzQkNqOTVLVEpSZEFheWFXVU5zeldocnU0MVZXTEZnU2xWMVhWeVBBVHRjXG5NbEFLcllJS1BRS0JnUUN0dUpwc0ExUTdpZUhRTDlrL0VhalZ0d25nMXpGSHJseDNpQjRZZmtsWlFYeFJC"
-      "TDJ5XG5yNjQvZ0xvY1lQRUo5dHlhdkNJYXBRcUtpQkFRK054U0VSa3h4elB6WGQ5aU55VEtZQld6SkI5cTcwNExJL3lNXG5EVGZKMndCd2taYkwxdjZ5Qkp1WU9YWkw0aTNPN1R3SnJHSFdMaXRIQT"
-      "A4V2V3aE01UlliWlVpdmVRS0JnUURaXG5nb3RBTjhDOXJzekxrRnBjT1NxSFdzcGM3L0RWM1oxMm5abXg3b1lXRUNuOFpnMzBmNWs4OWEza1JVdmZodnd0XG4zMGE1ZkQzNFZ3NjhvQ1lqeXBDZDM4"
-      "SHM2UUN2N2xuMXVzZ3JVaHJpVUJYQ1RVc0RTWFd4TjZnUDR6cVZ3YlJoXG5oQml0bWJ6VlV3M3JjcVQrTGZ5NW8zYUc4MWdsYWp4VG5qV3VJeGNWS1FLQmdFZ2xVSDhySnRsUFFSd3VlMEH5XG54dk"
-      "ZyNjNHWW0zYUU1cjNvQTlhSnJvdXFTYm5hU2VPa0pWWDg4cW1PTXM1NlRpTlFrTXhxWlgwZ1RmaCs2Q09DXG5HakdYbG9nMXhXZTY3NTFleEVqcDMvdTBQa2F4anVCclp0Z0VoL3NtNDE3VWJPeWdJ"
-      "dEpTN1BKQXp6aGNsc0VDXG43U1U5VFVBcXgyeHFrZGtwNkc3KzlMMXVcbi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS1cbiIsICJjbGllbnRfZW1haWwiOiAiZmlyZWJhc2UtYWRtaW5zZGstZmJzdm"
-      "NAdHJ1ZS1maXQtNTI3MTUuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20iLCAiY2xpZW50X2lkIjogIjExMjk3ODQyOTM1MjQ5OTQxMjI1NiIsICJhdXRoX3VyaSI6ICJodHRwczovL2FjY291bnRzLmdv"
-      "b2dsZS5jb20vby9vYXV0aDIvYXV0aCIsICJ0b2tlbl91cmkiOiAiaHR0cHM6Ly9vYXV0aDIuZ29vZ2xlYXBpcy5jb20vdG9rZW4iLCAiYXV0aF9wcm92aWRlcl94NTA5X2NlcnRfdXJsIjogImh0dH"
-      "BzOi8vd3d3Lmdvb2dsZWFwaXMuY29tL29hdXRoMi92MS9jZXJ0cyIsICJjbGllbnRfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9yb2JvdC92MS9tZXRhZGF0YS94"
-      "NTA5L2ZpcmViYXNlLWFkbWluc2RrLWZic3ZjJTQwdHJ1ZS1maXQtNTI3MTUuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20ifQ==";
+  static const String _keyBody = '''MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDueZwnCAZ7TUsh
+0/hVhtv0YW3kNX7CVFzCYzuFrEYD/GRhenOSl95l8cHWd5tAz+8EGGBH6XooBXu/
+K2/PBSDd2WoFf3TASuqClY+VaXurb92d/bu+ERAnWh1pwHSgB8+DZvAH2Kr5f1GI
+mREm2mmyJnTN/67ALdERx3gM1ZzwhoMMFPtCe0qEAGd/2kbRRVDgpHRDZeAak04r
+OIr3MlrGgOivRQfwpIt/4Fo95z1hV6v9nmanpgx7OUP2RhSQ1yHfOWbpcAzLtFEP
+l7jEXhAxXcMBkdiiwpEXaNkLzJ1oxzQpug7W/HzO9eXWlp075Xyur+JTBLe8FXuV
+Zg3qQ3rVAgMBAAECggEAAYEv7Ike7Vk7/58kQnni2mRg+p8hyR0aJrnUjs/a8zx8
+76aDoymlJBSF6hIAH0UQl4CF3v5IoIcEVFz0TCSWo/+yrQ00UeBHIYLLEKDFQHwo
+tE39CMJ3zR/C7r9hnP7fns8f9ZS243MbsxZwJsQbBZ47f289DYZcetW82qvgXR4h
+CFQWvP8lfMAoZy/9erH/afuwFesRqEZQmv+iSaKUwN5JRStbDpOPwSqevdGQeP+w
+HiswVgK+SU6HDkyY9ArUTDea0A+zPc1Y+PA0IKSSDM+xyLv+7ynqmert9flhx4Cz
+R6wlPXsjYhQj+zf11Kt1mUuD9cDHyiOqvzV6q069sQKBgQD4+GG0BRWkUxW3PnHZ
+n7MClH7av/8ZFWFebZaW36LMc2vXRf+PZPUhG4vsBTP7/br19JK7ri7xsFRtNv+S
++jlgD8vtwpStbIbV48B9XXQvcXP1PYzpls8YNJdT/WvYmUU9E/pRH7G+pjhQF/oV
+ClZOEo+CxYcCtGDZMgllf110eQKBgQD1NV3M6eOlor4EjLH/MAm5uVscFC0nY1D3
+SRe3QNADDqWLF8f2RBrvW71tBW9IeECzpcyEKCiam1aHm+Q4wcdWDqMB3whhOkkr
+v7KqAeB40CsPb1aNIRfV2sBCj95KTJRdAayaWUNlzWhru41VWLFgSlV1XVyPATtc
+MlAKrYIKPQKBgQCtuJpsA1Q7ieHQL9k/EajVtwng1zFHrlx3iB4YfklZQXxRBL2y
+r64/gLocYPEJ9tyavCIapQqKiBAQ+NxSERkxxzPzXd9iNyTKYBWzJB9q704LI/yM
+DTfJ2wBwkZbL1v6yBJuYOXZL4i3O7TwJrGHWLitHA08WewhM5RYbZUiveQKBgQDZ
+gotAN8C9rszLkFpcOSqHWspc7/DV3Z12nZmx7oYWECn8Zg30f5k89a3kRUvfhvwt
+30a5fD34Vw68oCYjypCd38Hs6QCv7ln1usgrUhriUBXCTUsDSXWxN6gP4zqVwbRh
+hBitmbzVUw3rcqT+Lfy5o3aG81glajxTnjWuIxcVKQKBgEglUH8rJtlPQRwue0Hy
+xvFr63GYm3aE5r3oA9aJrouqSbnaSeOkJVX88qmOMs56TiNQkMxqZX0gTfh+6COC
+GjGXlog1xWe6751exEjp3/u0PkaxjuBrZtgEh/sm417UbOygItJS7PJAzzhclsEC
+7SU9TUAqx2xqkdkp6G7+9L1u''';
+
+  static Map<String, dynamic>? _cachedCredentials;
 
   static Map<String, dynamic> get serviceAccountCredentials {
     if (_cachedCredentials != null) return _cachedCredentials!;
-    final String jsonStr = utf8.decode(base64Decode(_encodedCredentials));
-    _cachedCredentials = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+    final String fullKey = "$_keyHeader$_keyBody$_keyFooter";
+
+    print("🔑 [FCM v1] Service Account Key Loaded. Length: ${fullKey.length}");
+
+    _cachedCredentials = {
+      "type": "service_account",
+      "project_id": "true-fit-52715",
+      "private_key_id": "d6b995a92a948cdee303d4d6bdde3775f91dc9ba",
+      "private_key": fullKey,
+      "client_email": "firebase-adminsdk-fbsvc@true-fit-52715.iam.gserviceaccount.com",
+      "client_id": "112978429352499412256",
+      "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+      "token_uri": "https://oauth2.googleapis.com/token",
+      "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+      "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40true-fit-52715.iam.gserviceaccount.com",
+    };
     return _cachedCredentials!;
   }
 
@@ -54,9 +75,10 @@ class FcmV1Service {
       final String accessToken = client.credentials.accessToken.data;
       client.close();
 
+      print("✅ [FCM v1] Successfully generated OAuth2 Access Token (${accessToken.substring(0, 15)}...)");
       return accessToken;
     } catch (e) {
-      debugPrint("Error generating OAuth2 access token for FCM v1: $e");
+      print("❌ [FCM v1] Error generating OAuth2 access token: $e");
       return null;
     }
   }
@@ -69,10 +91,14 @@ class FcmV1Service {
   }) async {
     try {
       if (targetToken.isEmpty) return;
+      print("🔑 [FCM v1] Obtaining OAuth2 Access Token...");
       final String? accessToken = await _getAccessToken();
       final String projectId = serviceAccountCredentials['project_id'] ?? 'true-fit-52715';
 
-      if (accessToken == null) return;
+      if (accessToken == null) {
+        print("❌ [FCM v1] Failed to obtain access token.");
+        return;
+      }
 
       final Uri url = Uri.parse(
         'https://fcm.googleapis.com/v1/projects/$projectId/messages:send',
@@ -102,45 +128,58 @@ class FcmV1Service {
         body: jsonEncode(messagePayload),
       );
 
-      debugPrint('FCM HTTP v1 Response status: ${response.statusCode}');
-      debugPrint('FCM HTTP v1 Response body: ${response.body}');
+      print('✅ [FCM v1] Response status: ${response.statusCode}');
+      print('📩 [FCM v1] Response body: ${response.body}');
     } catch (e) {
-      debugPrint('Error sending FCM HTTP v1 notification: $e');
+      print('❌ [FCM v1] Exception sending notification: $e');
     }
   }
 
   /// Looks up coach FCM token from 'Gym_Coaches' collection and sends FCM push notification.
   static Future<void> sendNotificationToCoach({
-    required String coachId,
+    required dynamic coachId,
     required String title,
     required String body,
     Map<String, String>? data,
   }) async {
-    if (coachId.isEmpty) return;
+    if (coachId == null) return;
     try {
-      DocumentSnapshot<Map<String, dynamic>> coachDoc =
-          await FirebaseFirestore.instance.collection('Gym_Coaches').doc(coachId).get();
+      print("🔔 [FCM v1] Preparing notification for coach: $coachId ($title)");
+      final String coachIdStr = coachId.toString();
 
-      if (!coachDoc.exists) {
-        final q = await FirebaseFirestore.instance
+      DocumentSnapshot<Map<String, dynamic>>? coachDoc;
+
+      // 1. Try lookup by Doc ID
+      final docById = await FirebaseFirestore.instance
+          .collection('Gym_Coaches')
+          .doc(coachIdStr)
+          .get();
+
+      if (docById.exists) {
+        coachDoc = docById;
+      } else {
+        // 2. Fallback query by uid field
+        final query = await FirebaseFirestore.instance
             .collection('Gym_Coaches')
-            .where('uid', isEqualTo: coachId)
+            .where('uid', isEqualTo: coachIdStr)
             .limit(1)
             .get();
-        if (q.docs.isNotEmpty) {
-          coachDoc = q.docs.first;
+        if (query.docs.isNotEmpty) {
+          coachDoc = query.docs.first;
         }
       }
 
-      if (!coachDoc.exists) {
-        debugPrint("Coach doc $coachId not found in Gym_Coaches");
+      if (coachDoc == null || !coachDoc.exists) {
+        print("❌ [FCM v1] Coach doc for ID $coachIdStr not found in Gym_Coaches");
         return;
       }
 
       final coachData = coachDoc.data()!;
+      // Check both 'fcmToken' and 'fcm_token' fields
       final String? token = (coachData['fcmToken'] ?? coachData['fcm_token']) as String?;
 
       if (token != null && token.trim().isNotEmpty) {
+        print("📲 [FCM v1] Target Token found: ${token.trim().substring(0, 15)}...");
         await sendNotification(
           targetToken: token.trim(),
           title: title,
@@ -148,10 +187,69 @@ class FcmV1Service {
           data: data,
         );
       } else {
-        debugPrint("No FCM token found for coach $coachId");
+        print("⚠️ [FCM v1] No FCM token found in Gym_Coaches for coach $coachIdStr");
       }
     } catch (e) {
-      debugPrint("Error sending notification to coach $coachId: $e");
+      print("❌ [FCM v1] Error sending notification to coach $coachId: $e");
+    }
+  }
+
+  /// Looks up member FCM token from 'Gym_pers' collection and sends FCM push notification.
+  static Future<void> sendNotificationToMember({
+    required dynamic memberId,
+    required String title,
+    required String body,
+    Map<String, String>? data,
+  }) async {
+    if (memberId == null) return;
+    try {
+      print("🔔 [FCM v1] Preparing notification for member: $memberId ($title)");
+      final String memberIdStr = memberId.toString();
+      final int? memberIdInt = memberId is int ? memberId : int.tryParse(memberIdStr);
+
+      DocumentSnapshot<Map<String, dynamic>>? memberDoc;
+
+      // 1. Try lookup by Doc ID
+      final docById = await FirebaseFirestore.instance
+          .collection('Gym_pers')
+          .doc(memberIdStr)
+          .get();
+
+      if (docById.exists) {
+        memberDoc = docById;
+      } else if (memberIdInt != null) {
+        // 2. Fallback query by pers_ID field
+        final query = await FirebaseFirestore.instance
+            .collection('Gym_pers')
+            .where('pers_ID', isEqualTo: memberIdInt)
+            .limit(1)
+            .get();
+        if (query.docs.isNotEmpty) {
+          memberDoc = query.docs.first;
+        }
+      }
+
+      if (memberDoc == null || !memberDoc.exists) {
+        print("❌ [FCM v1] Member doc for ID $memberIdStr not found in Gym_pers");
+        return;
+      }
+
+      final memberData = memberDoc.data()!;
+      final String? token = (memberData['fcmToken'] ?? memberData['fcm_token']) as String?;
+
+      if (token != null && token.trim().isNotEmpty) {
+        print("📲 [FCM v1] Target Token found: ${token.trim().substring(0, 15)}...");
+        await sendNotification(
+          targetToken: token.trim(),
+          title: title,
+          body: body,
+          data: data,
+        );
+      } else {
+        print("⚠️ [FCM v1] No FCM token found in Gym_pers for member $memberIdStr");
+      }
+    } catch (e) {
+      print("❌ [FCM v1] Error sending notification to member $memberId: $e");
     }
   }
 }
