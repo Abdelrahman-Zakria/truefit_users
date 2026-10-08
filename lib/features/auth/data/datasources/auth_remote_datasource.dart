@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/intl.dart';
@@ -52,18 +53,31 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final user = UserModel.fromJson(userData);
     final int persId = user.persId ?? (userData['pers_ID'] is int ? userData['pers_ID'] : int.tryParse(userData['pers_ID']?.toString() ?? '0') ?? 0);
 
-    // 3. Subscribe to Members Topic & Save Member FCM Token on Login
+    // 3. Update FCM token in Gym_pers on login & show dialog on failure
     try {
+      if (Platform.isIOS) {
+        final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        if (apnsToken == null) {
+          throw Exception("APNs token is not ready on iOS. Ensure push permissions are granted and running on a physical iOS device.");
+        }
+      }
+
       await FirebaseMessaging.instance.subscribeToTopic('all_users');
       final token = await FirebaseMessaging.instance.getToken();
-      if (token != null && persId != 0) {
+      
+      if (token == null || token.trim().isEmpty) {
+        throw Exception("FCM token returned empty from device.");
+      }
+
+      if (persId != 0) {
         await _firestore
             .collection('Gym_pers')
             .doc(persId.toString())
             .set({'fcm_token': token, 'fcmToken': token}, SetOptions(merge: true));
       }
     } catch (e) {
-      print('Failed to subscribe topic / save FCM token on login: $e');
+      print('FCM Token retrieval failed on login: $e');
+      throw Exception('FCM_ERROR: Failed to update FCM token in Gym_pers: $e');
     }
 
     // 4. Check if member subscription is still pending receptionist approval
@@ -120,8 +134,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     // Get FCM token & subscribe to topic
     String? token;
     try {
-      await FirebaseMessaging.instance.subscribeToTopic('all_users');
-      token = await FirebaseMessaging.instance.getToken();
+      if (Platform.isIOS) {
+        final apns = await FirebaseMessaging.instance.getAPNSToken();
+        if (apns != null) {
+          await FirebaseMessaging.instance.subscribeToTopic('all_users');
+          token = await FirebaseMessaging.instance.getToken();
+        }
+      } else {
+        await FirebaseMessaging.instance.subscribeToTopic('all_users');
+        token = await FirebaseMessaging.instance.getToken();
+      }
     } catch (e) {
       print('Error getting FCM token / subscribing during registration: $e');
     }

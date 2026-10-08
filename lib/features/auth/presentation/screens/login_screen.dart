@@ -61,6 +61,65 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _showFcmErrorDialog(String errorMessage) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppTheme.primaryRed),
+        ),
+        title: Row(
+          children: [
+            const Icon(LucideIcons.alertTriangle, color: AppTheme.primaryRed),
+            const SizedBox(width: 8),
+            Text(
+              _lang == 'ar' ? 'خطأ في جلب الإشعارات' : 'FCM Token Error',
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _lang == 'ar'
+                    ? 'فشل جهازك في الحصول على رمز الإشعارات (FCM Token). تفاصيل الخطأ:'
+                    : 'The device failed to retrieve the FCM token. Error details:',
+                style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF2A2A2A)),
+                ),
+                child: SelectableText(
+                  errorMessage.replaceFirst('Exception: ', '').replaceFirst('FCM_ERROR: ', ''),
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontFamily: 'monospace'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              _lang == 'ar' ? 'حسناً' : 'OK',
+              style: const TextStyle(color: AppTheme.primaryRed, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _handleLogin() {
     if (_formKey.currentState!.validate()) {
       widget.onLogin(_phoneController.text, _passwordController.text);
@@ -77,7 +136,11 @@ class _LoginScreenState extends State<LoginScreen> {
       child: BlocListener<AuthCubit, AuthState>(
         listener: (context, state) {
           if (state is AuthError) {
-            _showErrorSnackBar(state.message);
+            if (state.message.contains('FCM_ERROR') || state.message.contains('FCM')) {
+              _showFcmErrorDialog(state.message);
+            } else {
+              _showErrorSnackBar(state.message);
+            }
           }
         },
         child: Scaffold(
